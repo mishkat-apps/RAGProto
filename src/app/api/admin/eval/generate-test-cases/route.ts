@@ -7,7 +7,7 @@ const log = createChildLogger('api-admin-eval-generate');
 
 export async function POST(request: NextRequest) {
     try {
-        const { bookId } = await request.json();
+        const { bookId } = await request.json().catch(() => ({}));
 
         if (!bookId) {
             return NextResponse.json({ error: 'bookId is required' }, { status: 400 });
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (bookError || !book) {
+            log.error({ bookId, error: bookError?.message }, 'Book not found');
             return NextResponse.json({ error: 'Book not found' }, { status: 404 });
         }
 
@@ -37,13 +38,13 @@ export async function POST(request: NextRequest) {
             .download(book.storage_path_parsed_md);
 
         if (downloadError || !fileData) {
-            return NextResponse.json({ error: `Failed to download markdown: ${downloadError?.message}` }, { status: 500 });
+            log.error({ error: downloadError?.message }, 'Failed to download markdown');
+            return NextResponse.json({ error: `Failed to download textbook content: ${downloadError?.message || 'Unknown error'}` }, { status: 500 });
         }
 
         const markdown = await fileData.text();
 
         // 3. Extract a random substantial snippet
-        // We'll take a chunk of ~4000 characters from the middle-ish to avoid intros/outros
         const start = Math.floor(Math.random() * Math.max(0, markdown.length - 8000));
         const snippet = markdown.substring(start, start + 8000);
 
@@ -71,19 +72,21 @@ Example format:
   { "question": "Define the term 'metamorphism' in the context of geology." }
 ]`;
 
-        const { GoogleAuth } = await import('google-auth-library');
-        const auth = new GoogleAuth({
-            scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-        });
-        const client = await auth.getClient();
-        const accessToken = await client.getAccessToken();
+        const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+        let accessToken: string;
+        try {
+            accessToken = await getVertexAccessToken();
+        } catch (authErr) {
+            log.error({ error: authErr instanceof Error ? authErr.message : String(authErr) }, 'Vertex Auth failed');
+            return NextResponse.json({ error: 'Authentication failed: Please check server configuration.' }, { status: 500 });
+        }
 
         const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.GEMINI_MODEL}:generateContent`;
 
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${accessToken.token}`,
+                Authorization: `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -99,7 +102,7 @@ Example format:
         if (!res.ok) {
             const errBody = await res.text();
             log.error({ status: res.status, body: errBody }, 'Gemini generation failed');
-            return NextResponse.json({ error: 'Failed to generate questions with AI' }, { status: 500 });
+            return NextResponse.json({ error: `AI Generation failed (${res.status}): ${errBody.slice(0, 100)}...` }, { status: 500 });
         }
 
         const data = await res.json();
@@ -109,11 +112,15 @@ Example format:
             return NextResponse.json({ error: 'AI returned an empty response' }, { status: 500 });
         }
 
-        const questions = JSON.parse(text);
-
-        return NextResponse.json({ questions });
+        try {
+            const questions = JSON.parse(text);
+            return NextResponse.json({ questions });
+        } catch (parseErr) {
+            log.error({ text, error: parseErr }, 'Failed to parse AI response');
+            return NextResponse.json({ error: 'Failed to parse the generated questions.' }, { status: 500 });
+        }
     } catch (err) {
         log.error({ error: err instanceof Error ? err.message : String(err) }, 'Generate test cases API failed');
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: `Internal server error: ${err instanceof Error ? err.message : 'Unknown'}` }, { status: 500 });
     }
 }

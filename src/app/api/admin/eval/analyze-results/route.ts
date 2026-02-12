@@ -6,7 +6,7 @@ const log = createChildLogger('api-admin-eval-analyze');
 
 export async function POST(request: NextRequest) {
     try {
-        const { results } = await request.json();
+        const { results } = await request.json().catch(() => ({}));
 
         if (!results || !Array.isArray(results) || results.length === 0) {
             return NextResponse.json({ error: 'Results are required' }, { status: 400 });
@@ -38,19 +38,21 @@ REPORT STRUCTURE:
 Format the output in clean Markdown. Use headings, bullet points, and bold text for readability.`;
 
         // 2. Call Gemini API
-        const { GoogleAuth } = await import('google-auth-library');
-        const auth = new GoogleAuth({
-            scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-        });
-        const client = await auth.getClient();
-        const accessToken = await client.getAccessToken();
+        const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+        let accessToken: string;
+        try {
+            accessToken = await getVertexAccessToken();
+        } catch (authErr) {
+            log.error({ error: authErr instanceof Error ? authErr.message : String(authErr) }, 'Vertex Auth failed');
+            return NextResponse.json({ error: 'Authentication failed: Please check server configuration.' }, { status: 500 });
+        }
 
         const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.GEMINI_MODEL}:generateContent`;
 
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${accessToken.token}`,
+                Authorization: `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -65,7 +67,7 @@ Format the output in clean Markdown. Use headings, bullet points, and bold text 
         if (!res.ok) {
             const errBody = await res.text();
             log.error({ status: res.status, body: errBody }, 'Gemini analysis failed');
-            return NextResponse.json({ error: 'Failed to analyze results with AI' }, { status: 500 });
+            return NextResponse.json({ error: `AI Analysis failed (${res.status}): ${errBody.slice(0, 100)}...` }, { status: 500 });
         }
 
         const data = await res.json();
@@ -78,6 +80,6 @@ Format the output in clean Markdown. Use headings, bullet points, and bold text 
         return NextResponse.json({ report });
     } catch (err) {
         log.error({ error: err instanceof Error ? err.message : String(err) }, 'Analyze results API failed');
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: `Internal server error: ${err instanceof Error ? err.message : 'Unknown'}` }, { status: 500 });
     }
 }

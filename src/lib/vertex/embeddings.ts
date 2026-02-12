@@ -40,13 +40,8 @@ async function callVertexEmbeddings(
     texts: string[],
     env: { VERTEX_PROJECT_ID: string; VERTEX_LOCATION: string; VERTEX_EMBEDDING_MODEL: string }
 ): Promise<number[][]> {
-    const { GoogleAuth } = await import('google-auth-library');
-    const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    });
-
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
+    const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+    const accessToken = await getVertexAccessToken();
 
     const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.VERTEX_EMBEDDING_MODEL}:predict`;
 
@@ -58,7 +53,7 @@ async function callVertexEmbeddings(
     const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-            Authorization: `Bearer ${accessToken.token}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ instances }),
@@ -82,20 +77,15 @@ async function callVertexEmbeddings(
 export async function generateQueryEmbedding(text: string): Promise<number[]> {
     const env = getEnv();
 
-    const { GoogleAuth } = await import('google-auth-library');
-    const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    });
-
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
+    const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+    const accessToken = await getVertexAccessToken();
 
     const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.VERTEX_EMBEDDING_MODEL}:predict`;
 
     const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-            Authorization: `Bearer ${accessToken.token}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({

@@ -157,12 +157,15 @@ async function classifyQuestion(question: string): Promise<string> {
 
 async function callGemini(prompt: string, systemPrompt?: string): Promise<string> {
     const env = getEnv();
-    const { GoogleAuth } = await import('google-auth-library');
-    const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    });
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
+    const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+
+    let accessToken: string;
+    try {
+        accessToken = await getVertexAccessToken();
+    } catch (authErr) {
+        log.error({ error: authErr instanceof Error ? authErr.message : String(authErr) }, 'Vertex Auth failed in flow');
+        throw new Error('AI Authentication failed. Please contact administrator.');
+    }
 
     const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.GEMINI_MODEL}:generateContent`;
 
@@ -178,7 +181,7 @@ async function callGemini(prompt: string, systemPrompt?: string): Promise<string
     const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-            Authorization: `Bearer ${accessToken.token}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -192,7 +195,8 @@ async function callGemini(prompt: string, systemPrompt?: string): Promise<string
 
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(`Gemini call failed (${res.status}): ${body}`);
+        log.error({ status: res.status, body }, 'Gemini call failed in flow');
+        throw new Error(`Gemini call failed (${res.status}): ${body.slice(0, 100)}`);
     }
 
     const data = await res.json();
