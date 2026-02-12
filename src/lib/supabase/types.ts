@@ -112,6 +112,11 @@ export interface IngestRequest {
     publisher?: string;
 }
 
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
 export interface AskRequest {
     question: string;
     filters?: {
@@ -121,6 +126,7 @@ export interface AskRequest {
         chapter?: string;
         topic?: string;
     };
+    history?: ChatMessage[];
     topK?: number;
 }
 

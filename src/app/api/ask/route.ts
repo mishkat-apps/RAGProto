@@ -4,6 +4,10 @@ import { z } from 'zod';
 
 const askSchema = z.object({
     question: z.string().min(1),
+    history: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string()
+    })).optional(),
     filters: z
         .object({
             book_id: z.string().uuid().optional(),

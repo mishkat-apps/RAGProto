@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BookOpen, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
+import { BookOpen, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Play, RotateCcw } from 'lucide-react';
 
 interface BookWithJob {
     id: string;
@@ -24,6 +24,7 @@ export default function BooksPage() {
     const [books, setBooks] = useState<BookWithJob[]>([]);
     const [loading, setLoading] = useState(true);
     const [workerRunning, setWorkerRunning] = useState(false);
+    const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
 
     const fetchBooks = async () => {
         setLoading(true);
@@ -38,6 +39,7 @@ export default function BooksPage() {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchBooks();
     }, []);
 
@@ -59,6 +61,38 @@ export default function BooksPage() {
             alert(`Worker failed: ${err instanceof Error ? err.message : String(err)}`);
         }
         setWorkerRunning(false);
+    };
+
+    const retryJob = async (jobId: string) => {
+        setRetryingJobId(jobId);
+        try {
+            const res = await fetch('/api/jobs/retry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_id: jobId }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                alert(`Retry failed: ${data.error}`);
+                setRetryingJobId(null);
+                return;
+            }
+
+            // Automatically run the worker after re-queuing
+            const secret = prompt('Enter WORKER_SECRET to run the worker:');
+            if (secret) {
+                await fetch('/api/worker/ingest', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${secret}` },
+                });
+            }
+
+            fetchBooks();
+        } catch (err) {
+            alert(`Retry failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        setRetryingJobId(null);
     };
 
     const statusIcon = (status: string) => {
@@ -160,6 +194,9 @@ export default function BooksPage() {
                                 <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
                                     Created
                                 </th>
+                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -199,6 +236,22 @@ export default function BooksPage() {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
                                         {new Date(book.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {book.latest_job?.status === 'failed' && (
+                                            <button
+                                                onClick={() => retryJob(book.latest_job!.id)}
+                                                disabled={retryingJobId === book.latest_job!.id}
+                                                className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-medium hover:bg-red-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                            >
+                                                {retryingJobId === book.latest_job!.id ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <RotateCcw className="w-3 h-3" />
+                                                )}
+                                                Retry
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

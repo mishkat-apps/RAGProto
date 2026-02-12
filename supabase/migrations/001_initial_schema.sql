@@ -56,11 +56,11 @@ CREATE INDEX idx_chunks_book ON chunks(book_id);
 CREATE INDEX idx_chunks_section ON chunks(section_id);
 CREATE INDEX idx_chunks_content_hash ON chunks(content_hash);
 
--- IVFFlat vector index for similarity search
--- NOTE: Requires at least some data before building IVFFlat.
--- For small datasets, use exact search. For production, rebuild after loading data.
+-- HNSW vector index for similarity search
+-- HNSW provides excellent recall without needing to tune probes/lists.
+-- Much better than IVFFlat for datasets under ~100K rows.
 CREATE INDEX idx_chunks_embedding ON chunks
-  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+  USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- Full-text search GIN index
 CREATE INDEX idx_chunks_content_fts ON chunks

@@ -18,9 +18,9 @@ const log = createChildLogger('genkit-flows');
  * 5) If context weak: refuse and ask clarifying question
  */
 export async function answerNECTAQuestion(request: AskRequest): Promise<AskResponse> {
-    const { question, filters, topK = 20 } = request;
+    const { question, filters, history = [], topK = 20 } = request;
 
-    log.info({ question, filters }, 'Starting answerNECTAQuestion flow');
+    log.info({ question, filters, historyCount: history.length }, 'Starting answerNECTAQuestion flow');
 
     // Step 1: Classify question type
     const questionType = await classifyQuestion(question);
@@ -38,54 +38,90 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
 
     if (rawChunks.length === 0) {
         return {
-            answer:
-                'No relevant content was found in the textbook for this question. Please try rephrasing your question or selecting a different book/subject.',
+            answer: 'I could not find any relevant information in the uploaded textbooks to answer your question.',
             citations: [],
-            confidence: 'low',
+            confidence: 'low'
         };
     }
 
-    // Step 3: Enrich with metadata + Rerank
+    // Step 3: Rerank
     const enrichedChunks = await enrichChunksWithContext(rawChunks);
-    const rerankedIds = await rerankChunks(question, enrichedChunks, 8);
+    const rerankedIds = await rerankChunks(question, enrichedChunks);
 
     // Select top chunks in reranked order
     const topChunks = rerankedIds
         .map((id) => enrichedChunks.find((c) => c.id === id))
         .filter(Boolean) as typeof enrichedChunks;
 
-    // Fallback if reranking returned nothing useful
     const finalChunks = topChunks.length > 0 ? topChunks : enrichedChunks.slice(0, 8);
 
-    // Step 4: Generate answer
-    const contextStr = finalChunks
+    // Step 4: Group chunks by source metadata to avoid duplicate footnote numbers
+    const sourcesMap = new Map<string, {
+        book_title: string;
+        chapter: string;
+        topic: string;
+        page_start: number | null;
+        page_end: number | null;
+        content: string[];
+        chunk_ids: string[];
+    }>();
+
+    for (const chunk of finalChunks) {
+        const key = `${chunk.book_title}|${chunk.chapter}|${chunk.topic}|${chunk.page_start}|${chunk.page_end}`;
+        const existing = sourcesMap.get(key);
+        if (existing) {
+            existing.content.push(chunk.content);
+            existing.chunk_ids.push(chunk.id);
+        } else {
+            sourcesMap.set(key, {
+                book_title: chunk.book_title,
+                chapter: chunk.chapter || 'Unknown',
+                topic: chunk.topic || '',
+                page_start: chunk.page_start,
+                page_end: chunk.page_end,
+                content: [chunk.content],
+                chunk_ids: [chunk.id]
+            });
+        }
+    }
+
+    const groupedSources = Array.from(sourcesMap.values());
+
+    const contextStr = groupedSources
         .map(
-            (c, i) =>
-                `[Chunk ${i + 1}] (${c.chapter || 'Unknown Chapter'}, ${c.topic || 'Unknown Topic'}, pp. ${c.page_start || '?'}–${c.page_end || '?'})\n${c.content}`
+            (s, i) =>
+                `[Source ${i + 1}] (${s.chapter}, ${s.topic}, pp. ${s.page_start || '?'}–${s.page_end || '?'})\n${s.content.join('\n\n')}`
         )
         .join('\n\n---\n\n');
 
+    const historyStr = history.length > 0
+        ? history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')
+        : 'No previous history.';
+
     const prompt = ANSWER_PROMPT.replace('{questionType}', questionType)
         .replace('{question}', question)
+        .replace('{history}', historyStr)
         .replace('{context}', contextStr);
 
     const answer = await callGemini(prompt, ANSWER_SYSTEM_PROMPT);
 
-    // Step 5: Build citations
-    const citations: Citation[] = finalChunks.map((c) => ({
-        chunk_id: c.id,
-        book_title: c.book_title,
-        chapter: c.chapter || 'Unknown',
-        topic: c.topic || '',
-        page_start: c.page_start,
-        page_end: c.page_end,
+    // Step 5: Build citations mapped to sources
+    const citations: Citation[] = groupedSources.map((s) => ({
+        chunk_id: s.chunk_ids[0], // Use first chunk ID as primary
+        book_title: s.book_title,
+        chapter: s.chapter,
+        topic: s.topic,
+        page_start: s.page_start,
+        page_end: s.page_end,
     }));
 
     // Determine confidence
-    const avgSimilarity =
-        finalChunks.reduce((sum, c) => sum + c.similarity, 0) / finalChunks.length;
+    // Use top-3 similarity average for confidence (more representative than all chunks)
+    const topChunksSorted = [...finalChunks].sort((a, b) => b.similarity - a.similarity);
+    const top3 = topChunksSorted.slice(0, Math.min(3, topChunksSorted.length));
+    const avgSimilarity = top3.reduce((sum, c) => sum + c.similarity, 0) / top3.length;
     const confidence: 'high' | 'medium' | 'low' =
-        avgSimilarity > 0.8 ? 'high' : avgSimilarity > 0.6 ? 'medium' : 'low';
+        avgSimilarity > 0.75 ? 'high' : avgSimilarity > 0.55 ? 'medium' : 'low';
 
     // Log query
     try {

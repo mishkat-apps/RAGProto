@@ -133,6 +133,38 @@ function splitBySentences(text: string, maxTokens: number): string[] {
         chunks.push(current.trim());
     }
 
+    // Hard-split any remaining oversized chunks by characters (~3 chars per token)
+    return chunks.flatMap((chunk) => {
+        if (estimateTokens(chunk) > maxTokens * 2) {
+            return hardSplitByCharacters(chunk, maxTokens);
+        }
+        return [chunk];
+    });
+}
+
+/**
+ * Last-resort fallback: split by character count, breaking at word boundaries.
+ */
+function hardSplitByCharacters(text: string, maxTokens: number): string[] {
+    const maxChars = maxTokens * 3; // ~3 chars per token
+    const words = text.split(/\s+/);
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const word of words) {
+        const combined = current ? `${current} ${word}` : word;
+        if (combined.length > maxChars && current) {
+            chunks.push(current.trim());
+            current = word;
+        } else {
+            current = combined;
+        }
+    }
+
+    if (current.trim()) {
+        chunks.push(current.trim());
+    }
+
     return chunks;
 }
 

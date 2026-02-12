@@ -1,6 +1,9 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { generateQueryEmbedding } from '@/lib/vertex/embeddings';
+import { createChildLogger } from '@/lib/logger';
 import type { MatchedChunk } from '@/lib/supabase/types';
+
+const log = createChildLogger('retrieval');
 
 /**
  * Retrieve relevant chunks via vector similarity search.
@@ -22,7 +25,7 @@ export async function retrieveChunks(
     // Call the match_chunks RPC
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.rpc('match_chunks', {
-        query_embedding: JSON.stringify(queryEmbedding),
+        query_embedding: queryEmbedding,
         match_count: topK,
         filter_book_id: bookId || null,
         filter_subject: subject || null,
@@ -33,7 +36,21 @@ export async function retrieveChunks(
         throw new Error(`match_chunks RPC failed: ${error.message}`);
     }
 
-    return (data || []) as MatchedChunk[];
+    const results = (data || []) as MatchedChunk[];
+
+    // Log similarity scores for debugging
+    if (results.length > 0) {
+        const topSim = results[0]?.similarity?.toFixed(4);
+        const botSim = results[results.length - 1]?.similarity?.toFixed(4);
+        log.info(
+            { count: results.length, topSimilarity: topSim, bottomSimilarity: botSim },
+            'Chunks retrieved from vector search'
+        );
+    } else {
+        log.warn('No chunks returned from vector search');
+    }
+
+    return results;
 }
 
 /**

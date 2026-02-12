@@ -13,7 +13,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 
     log.info({ count: texts.length }, 'Generating embeddings');
 
-    const results = await batchProcess(texts, 100, async (batch, batchIdx) => {
+    const results = await batchProcess(texts, 5, async (batch, batchIdx) => {
         log.debug({ batchIdx, batchSize: batch.length }, 'Processing embedding batch');
 
         const embeddings = await withRetry(
@@ -51,7 +51,7 @@ async function callVertexEmbeddings(
     const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.VERTEX_EMBEDDING_MODEL}:predict`;
 
     const instances = texts.map((text) => ({
-        content: text.slice(0, 3000), // Truncate very long texts
+        content: text.slice(0, 50000), // ~16K tokens — stay under Vertex 20K limit
         task_type: 'RETRIEVAL_DOCUMENT',
     }));
 

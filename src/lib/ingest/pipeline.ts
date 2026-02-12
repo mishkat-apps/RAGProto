@@ -29,9 +29,28 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
     const env = getEnv();
     const { jobId, storagePath, title, subject, form, language, publisher } = input;
 
+    let bookId: string | null = null;
+
     try {
         // Update job status to running
         await updateJob(jobId, { status: 'running', progress: 5 });
+
+        // Check if this is a retry — look for existing book_id on the job
+        const { data: existingJob } = await supabase
+            .from('ingest_jobs')
+            .select('book_id')
+            .eq('id', jobId)
+            .single();
+
+        if (existingJob?.book_id) {
+            // Retry: reuse existing book, clean up old partial data
+            bookId = existingJob.book_id;
+            log.info({ bookId }, 'Retry detected — cleaning up previous partial data');
+
+            // Delete old chunks and sections so we can re-ingest cleanly
+            await supabase.from('chunks').delete().eq('book_id', bookId);
+            await supabase.from('sections').delete().eq('book_id', bookId);
+        }
 
         // Step 1: Download PDF from Supabase Storage
         log.info({ storagePath }, 'Step 1: Downloading PDF from Storage');
@@ -72,35 +91,58 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
             log.warn({ error: uploadError.message }, 'Failed to upload parsed markdown (non-fatal)');
         }
 
-        // Step 5: Create book record
-        log.info('Step 5: Creating book record');
-        const bookInsert: BookInsert = {
-            title,
-            subject,
-            form,
-            language,
-            publisher: publisher || null,
-            storage_path_pdf: storagePath,
-            storage_path_parsed_md: mdPath,
-        };
+        // Step 5: Create or reuse book record
+        if (bookId) {
+            // Retry — update existing book record
+            log.info({ bookId }, 'Step 5: Updating existing book record');
+            await supabase
+                .from('books')
+                .update({
+                    title,
+                    subject,
+                    form,
+                    language,
+                    publisher: publisher || null,
+                    storage_path_pdf: storagePath,
+                    storage_path_parsed_md: mdPath,
+                })
+                .eq('id', bookId);
+        } else {
+            // First run — create new book
+            log.info('Step 5: Creating book record');
+            const bookInsert: BookInsert = {
+                title,
+                subject,
+                form,
+                language,
+                publisher: publisher || null,
+                storage_path_pdf: storagePath,
+                storage_path_parsed_md: mdPath,
+            };
 
-        const { data: book, error: bookError } = await supabase
-            .from('books')
-            .insert(bookInsert)
-            .select()
-            .single();
+            const { data: book, error: bookError } = await supabase
+                .from('books')
+                .insert(bookInsert)
+                .select()
+                .single();
 
-        if (bookError || !book) {
-            throw new Error(`Failed to create book: ${bookError?.message}`);
+            if (bookError || !book) {
+                throw new Error(`Failed to create book: ${bookError?.message}`);
+            }
+
+            bookId = book.id;
         }
 
         // Update job with book_id
-        await updateJob(jobId, { book_id: book.id, progress: 40 });
+        if (!bookId) {
+            throw new Error('Book ID is unexpectedly null after creation step');
+        }
+        await updateJob(jobId, { book_id: bookId, progress: 40 });
 
         // Step 6: Extract structure
         log.info('Step 6: Extracting structure');
         const structure = extractStructure(cleanMd, pageMap);
-        const sectionRows = flattenSectionsForDb(structure, book.id);
+        const sectionRows = flattenSectionsForDb(structure, bookId);
 
         if (sectionRows.length > 0) {
             const { error: secError } = await supabase.from('sections').insert(sectionRows);
@@ -115,7 +157,7 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
         const { data: dbSections } = await supabase
             .from('sections')
             .select('id, title')
-            .eq('book_id', book.id);
+            .eq('book_id', bookId);
 
         const sectionIdMap = new Map<string, string>();
         for (const s of dbSections || []) {
@@ -124,8 +166,8 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
 
         // Step 7: Chunk text
         log.info('Step 7: Chunking text');
-        const rawChunks = chunkSections(structure, book.id);
-        const chunkInserts = await prepareChunksForDb(rawChunks, book.id, sectionIdMap);
+        const rawChunks = chunkSections(structure, bookId);
+        const chunkInserts = await prepareChunksForDb(rawChunks, bookId, sectionIdMap);
         log.info({ chunkCount: chunkInserts.length }, 'Chunks prepared');
         await updateJob(jobId, { progress: 60 });
 
@@ -157,11 +199,26 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
         });
 
         await updateJob(jobId, { status: 'succeeded', progress: 100 });
-        log.info({ jobId, bookId: book.id, chunks: chunkInserts.length }, 'Ingestion completed');
+        log.info({ jobId, bookId, chunks: chunkInserts.length }, 'Ingestion completed');
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error({ jobId, error: message }, 'Ingestion pipeline failed');
-        await updateJob(jobId, { status: 'failed', error: message });
+
+        // Clean up partial data on failure
+        if (bookId) {
+            log.info({ bookId }, 'Cleaning up partial data after failure');
+            try {
+                await supabase.from('chunks').delete().eq('book_id', bookId);
+                await supabase.from('sections').delete().eq('book_id', bookId);
+                await supabase.from('books').delete().eq('id', bookId);
+                // Clear book_id from the job so next retry creates fresh
+                await updateJob(jobId, { status: 'failed', error: message, book_id: null as unknown as string });
+            } catch (cleanupErr) {
+                log.error({ cleanupErr }, 'Failed to clean up partial data');
+            }
+        } else {
+            await updateJob(jobId, { status: 'failed', error: message });
+        }
         throw err;
     }
 }
