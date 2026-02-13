@@ -6,7 +6,7 @@ import type { MatchedChunk } from '@/lib/supabase/types';
 const log = createChildLogger('retrieval');
 
 /**
- * Retrieve relevant chunks via vector similarity search.
+ * Retrieve relevant chunks via hybrid search (vector + full-text).
  */
 export async function retrieveChunks(
     question: string,
@@ -23,8 +23,63 @@ export async function retrieveChunks(
     // Generate query embedding
     const queryEmbedding = await generateQueryEmbedding(question);
 
-    // Call the match_chunks RPC
+    // Call the hybrid_search RPC (vector + keyword)
     const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.rpc('hybrid_search', {
+        query_embedding: queryEmbedding,
+        query_text: question,
+        match_count: topK,
+        similarity_threshold: similarityThreshold,
+        vector_weight: 0.7,
+        text_weight: 0.3,
+        filter_book_id: bookId || null,
+        filter_subject: subject || null,
+        filter_form: form || null,
+    });
+
+    if (error) {
+        // Fallback to match_chunks if hybrid_search doesn't exist yet
+        if (error.message.includes('hybrid_search')) {
+            log.warn('hybrid_search not available, falling back to match_chunks');
+            return retrieveChunksFallback(queryEmbedding, question, opts);
+        }
+        throw new Error(`hybrid_search RPC failed: ${error.message}`);
+    }
+
+    const results = (data || []) as MatchedChunk[];
+
+    // Log scores for debugging
+    if (results.length > 0) {
+        const topSim = results[0]?.similarity?.toFixed(4);
+        const botSim = results[results.length - 1]?.similarity?.toFixed(4);
+        log.info(
+            { count: results.length, topScore: topSim, bottomScore: botSim, threshold: similarityThreshold, mode: 'hybrid' },
+            'Chunks retrieved from hybrid search'
+        );
+    } else {
+        log.warn('No chunks returned from hybrid search');
+    }
+
+    return results;
+}
+
+/**
+ * Fallback to original vector-only search if hybrid_search isn't deployed yet.
+ */
+async function retrieveChunksFallback(
+    queryEmbedding: number[],
+    question: string,
+    opts: {
+        bookId?: string;
+        subject?: string;
+        form?: number;
+        topK?: number;
+        similarityThreshold?: number;
+    } = {}
+): Promise<MatchedChunk[]> {
+    const { bookId, subject, form, topK = 12, similarityThreshold = 0.5 } = opts;
+    const supabase = getSupabaseAdmin();
+
     const { data, error } = await supabase.rpc('match_chunks', {
         query_embedding: queryEmbedding,
         match_count: topK,
@@ -39,19 +94,14 @@ export async function retrieveChunks(
     }
 
     const results = (data || []) as MatchedChunk[];
-
-    // Log similarity scores for debugging
     if (results.length > 0) {
         const topSim = results[0]?.similarity?.toFixed(4);
         const botSim = results[results.length - 1]?.similarity?.toFixed(4);
         log.info(
-            { count: results.length, topSimilarity: topSim, bottomSimilarity: botSim, threshold: similarityThreshold },
-            'Chunks retrieved from vector search'
+            { count: results.length, topSimilarity: topSim, bottomSimilarity: botSim, mode: 'vector-only' },
+            'Chunks retrieved (fallback)'
         );
-    } else {
-        log.warn('No chunks returned from vector search');
     }
-
     return results;
 }
 

@@ -1,6 +1,7 @@
 import { createChildLogger } from '@/lib/logger';
 import { getEnv } from '@/lib/env';
 import { retrieveChunks, expandWithSiblingChunks, enrichChunksWithContext } from '@/lib/rag/retrieval';
+import { expandQuery } from '@/lib/rag/queryExpansion';
 import { rerankChunksWithScores } from '@/lib/rag/rerank';
 import { CLASSIFY_PROMPT } from './prompts/classify';
 import { ANSWER_PROMPT, ANSWER_SYSTEM_PROMPT } from './prompts/answer';
@@ -41,18 +42,23 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
         return { answer, citations: [], confidence: 'high' };
     }
 
-    // Step 3: Retrieve chunks for academic queries or follow-ups
-    const vectorChunks = await retrieveChunks(question, {
+    // Step 3: Expand query with related terms for better retrieval
+    const searchQuery = (intent === 'academic_query')
+        ? await expandQuery(question)
+        : question;
+
+    // Step 3b: Retrieve chunks via hybrid search
+    const vectorChunks = await retrieveChunks(searchQuery, {
         bookId: filters?.book_id,
         subject: filters?.subject,
         form: filters?.form,
         topK,
     });
 
-    // Step 3b: Expand with sibling chunks from the same section
+    // Step 3c: Expand with sibling chunks from the same section
     const rawChunks = await expandWithSiblingChunks(vectorChunks, topK + 3);
 
-    log.info({ vectorCount: vectorChunks.length, expandedCount: rawChunks.length, intent }, 'Chunks retrieved and expanded');
+    log.info({ vectorCount: vectorChunks.length, expandedCount: rawChunks.length, intent, queryExpanded: searchQuery !== question }, 'Chunks retrieved and expanded');
 
     // For academic queries, if no chunks found, return refusal
     if (intent === 'academic_query' && rawChunks.length === 0) {

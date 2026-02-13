@@ -12,12 +12,17 @@ export interface RawChunk {
     sectionId?: string;
 }
 
-const SMALL_CHUNK_TOKENS = { min: 100, max: 350 };
-const MEDIUM_CHUNK_TOKENS = { min: 350, max: 900 };
+const CHUNK_TOKENS = { min: 100, max: 500 };
+const OVERLAP_SENTENCES = 2; // Carry last N sentences from previous chunk
 
 /**
- * Chunk extracted sections into small and medium chunks.
+ * Chunk extracted sections into contextual, overlapping chunks.
  * Tags each chunk with a type based on content/heading analysis.
+ *
+ * Improvements over v1:
+ * - Section-context prefix: each chunk starts with "[Chapter: X] [Topic: Y]"
+ * - Overlap: last 2 sentences of previous chunk are carried into next
+ * - Larger chunks (500 tokens max) to preserve more context
  */
 export function chunkSections(
     sections: ExtractedSection[],
@@ -31,10 +36,19 @@ export function chunkSections(
         const chunkType = classifyChunkType(section.title, section.content);
 
         if (section.content.trim().length > 0) {
-            const textChunks = splitTextIntoChunks(section.content, SMALL_CHUNK_TOKENS.max);
+            // Build section-context prefix
+            const contextPrefix = buildContextPrefix(sectionPath);
+
+            const textChunks = splitTextIntoChunksWithOverlap(
+                section.content,
+                CHUNK_TOKENS.max,
+                contextPrefix
+            );
 
             for (const text of textChunks) {
-                if (estimateTokens(text) < 30) continue; // Skip tiny fragments
+                // Skip tiny fragments (after stripping prefix for size check)
+                const contentWithoutPrefix = text.replace(contextPrefix, '').trim();
+                if (estimateTokens(contentWithoutPrefix) < 30) continue;
 
                 chunks.push({
                     content: text.trim(),
@@ -54,6 +68,90 @@ export function chunkSections(
     }
 
     return chunks;
+}
+
+/**
+ * Build a context prefix from the section path.
+ * e.g., "Climate > Altitude" → "[Chapter: Climate] [Topic: Altitude]\n\n"
+ */
+function buildContextPrefix(sectionPath: string): string {
+    const parts = sectionPath.split(' > ').map((s) => s.trim()).filter(Boolean);
+
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return `[Chapter: ${parts[0]}]\n\n`;
+    if (parts.length === 2) return `[Chapter: ${parts[0]}] [Topic: ${parts[1]}]\n\n`;
+
+    // 3+ levels: Chapter > Topic > Subtopic
+    return `[Chapter: ${parts[0]}] [Topic: ${parts[1]}] [Subtopic: ${parts.slice(2).join(' > ')}]\n\n`;
+}
+
+/**
+ * Split text into chunks with overlap at boundaries.
+ * Each chunk gets the section-context prefix prepended.
+ */
+function splitTextIntoChunksWithOverlap(
+    text: string,
+    maxTokens: number,
+    contextPrefix: string
+): string[] {
+    const prefixTokens = estimateTokens(contextPrefix);
+    const effectiveMax = maxTokens - prefixTokens;
+    const paragraphs = text.split(/\n\n+/);
+    const rawChunks: string[] = [];
+    let currentChunk = '';
+
+    for (const para of paragraphs) {
+        const combined = currentChunk ? `${currentChunk}\n\n${para}` : para;
+
+        if (estimateTokens(combined) > effectiveMax && currentChunk) {
+            rawChunks.push(currentChunk);
+            currentChunk = para;
+        } else {
+            currentChunk = combined;
+        }
+    }
+
+    if (currentChunk.trim()) {
+        rawChunks.push(currentChunk);
+    }
+
+    // Split oversized paragraphs by sentences
+    const splitChunks = rawChunks.flatMap((chunk) => {
+        if (estimateTokens(chunk) > effectiveMax * 1.5) {
+            return splitBySentences(chunk, effectiveMax);
+        }
+        return [chunk];
+    });
+
+    // Apply overlap: carry last N sentences from previous chunk
+    const overlappedChunks: string[] = [];
+    for (let i = 0; i < splitChunks.length; i++) {
+        if (i === 0) {
+            overlappedChunks.push(contextPrefix + splitChunks[i]);
+        } else {
+            const prevSentences = extractLastSentences(splitChunks[i - 1], OVERLAP_SENTENCES);
+            const overlap = prevSentences ? `${prevSentences}\n\n` : '';
+            const withOverlap = overlap + splitChunks[i];
+
+            // Only add overlap if it doesn't make the chunk too large
+            if (estimateTokens(withOverlap) <= effectiveMax * 1.2) {
+                overlappedChunks.push(contextPrefix + withOverlap);
+            } else {
+                overlappedChunks.push(contextPrefix + splitChunks[i]);
+            }
+        }
+    }
+
+    return overlappedChunks;
+}
+
+/**
+ * Extract the last N sentences from a text block.
+ */
+function extractLastSentences(text: string, count: number): string {
+    const sentences = text.match(/[^.!?]+[.!?]+/g);
+    if (!sentences || sentences.length === 0) return '';
+    return sentences.slice(-count).join(' ').trim();
 }
 
 /**
@@ -80,38 +178,6 @@ function classifyChunkType(heading: string, content: string): ChunkType {
     }
 
     return 'explanation';
-}
-
-/**
- * Split text into chunks respecting paragraph boundaries.
- */
-function splitTextIntoChunks(text: string, maxTokens: number): string[] {
-    const paragraphs = text.split(/\n\n+/);
-    const chunks: string[] = [];
-    let currentChunk = '';
-
-    for (const para of paragraphs) {
-        const combined = currentChunk ? `${currentChunk}\n\n${para}` : para;
-
-        if (estimateTokens(combined) > maxTokens && currentChunk) {
-            chunks.push(currentChunk);
-            currentChunk = para;
-        } else {
-            currentChunk = combined;
-        }
-    }
-
-    if (currentChunk.trim()) {
-        chunks.push(currentChunk);
-    }
-
-    // If a single paragraph exceeds maxTokens, split by sentences
-    return chunks.flatMap((chunk) => {
-        if (estimateTokens(chunk) > maxTokens * 1.5) {
-            return splitBySentences(chunk, maxTokens);
-        }
-        return [chunk];
-    });
 }
 
 function splitBySentences(text: string, maxTokens: number): string[] {
@@ -215,10 +281,16 @@ function extractKeywords(text: string): string[] {
         'such', 'into', 'about', 'between', 'through', 'during', 'before',
         'after', 'above', 'below', 'up', 'down', 'out', 'off', 'over',
         'under', 'again', 'further', 'once', 'more', 'most', 'other', 'some',
-        'very', 'just', 'only',
+        'very', 'just', 'only', 'chapter', 'topic', 'subtopic',
     ]);
 
-    const words = text
+    // Strip the context prefix before extracting keywords
+    const cleanText = text
+        .replace(/\[Chapter:[^\]]*\]/g, '')
+        .replace(/\[Topic:[^\]]*\]/g, '')
+        .replace(/\[Subtopic:[^\]]*\]/g, '');
+
+    const words = cleanText
         .toLowerCase()
         .replace(/[^a-z\s]/g, '')
         .split(/\s+/)
