@@ -58,7 +58,7 @@ interface QueryResult {
     elapsed_ms: number;
 }
 
-async function supabaseQuery(query: string): Promise<any> {
+async function supabaseQuery(): Promise<unknown> {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
         method: 'POST',
         headers: {
@@ -191,11 +191,16 @@ async function main() {
     console.log(newStats.sample_content.slice(0, 200));
 
     // 3. Run queries
-    const report: any = {
+    const report: {
+        timestamp: string;
+        old_book: { id: string, title: string, stats: ChunkStats };
+        new_book: { id: string, title: string, stats: ChunkStats };
+        comparisons: any[];
+    } = {
         timestamp: new Date().toISOString(),
         old_book: { id: oldBook.id, title: oldBook.title, stats: oldStats },
         new_book: { id: newBook.id, title: newBook.title, stats: newStats },
-        comparisons: [] as any[],
+        comparisons: [],
     };
 
     for (const q of TEST_QUERIES) {

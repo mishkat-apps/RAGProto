@@ -31,13 +31,21 @@ interface EvalResult {
     };
 }
 
+interface Book {
+    id: string;
+    title: string;
+    form?: number;
+}
+
 export default function EvalPage() {
     const [results, setResults] = useState<EvalResult[]>([]);
     const [loading, setLoading] = useState(false);
-    const [books, setBooks] = useState<any[]>([]);
+    const [books, setBooks] = useState<Book[]>([]);
     const [selectedBookId, setSelectedBookId] = useState('');
     const [questionsJson, setQuestionsJson] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    const [generating, setGenerating] = useState(false);
 
     useEffect(() => {
         fetch('/api/books')
@@ -47,6 +55,29 @@ export default function EvalPage() {
                 if (d.books?.length > 0) setSelectedBookId(d.books[0].id);
             });
     }, []);
+
+    const generateTestCases = async () => {
+        if (!selectedBookId) return;
+        setGenerating(true);
+        try {
+            const res = await fetch('/api/admin/eval/generate-test-cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookId: selectedBookId }),
+            });
+            const data = await res.json();
+            if (data.questions) {
+                setQuestionsJson(JSON.stringify(data.questions, null, 2));
+            } else {
+                alert(data.error || 'Failed to generate questions');
+            }
+        } catch (err) {
+            console.error('Generation failed:', err);
+            alert('Network error while generating questions.');
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     const runEval = async () => {
         if (!selectedBookId || !questionsJson) return;
@@ -121,22 +152,33 @@ export default function EvalPage() {
                             </select>
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between ml-1">
-                                <label className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider font-bold">Question Set (JSON)</label>
-                                <button
-                                    onClick={() => setQuestionsJson(JSON.stringify([{ question: 'What is geography?' }], null, 2))}
-                                    className="text-[10px] text-[var(--primary)] font-bold hover:underline"
-                                >
-                                    Load Example
-                                </button>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between ml-1">
+                                    <label className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider font-bold">Question Set (JSON)</label>
+                                    <button
+                                        onClick={() => setQuestionsJson(JSON.stringify([{ question: 'What is geography?' }], null, 2))}
+                                        className="text-[10px] text-[var(--primary)] font-bold hover:underline"
+                                    >
+                                        Load Example
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={questionsJson}
+                                    onChange={(e) => setQuestionsJson(e.target.value)}
+                                    placeholder='[{"question": "..."}]'
+                                    className="w-full h-48 px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all text-xs font-mono resize-none shadow-inner"
+                                />
                             </div>
-                            <textarea
-                                value={questionsJson}
-                                onChange={(e) => setQuestionsJson(e.target.value)}
-                                placeholder='[{"question": "..."}]'
-                                className="w-full h-64 px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all text-xs font-mono resize-none shadow-inner"
-                            />
+
+                            <button
+                                onClick={generateTestCases}
+                                disabled={generating || !selectedBookId}
+                                className="w-full py-3 rounded-xl border border-[var(--primary)]/30 text-[var(--primary)] text-xs font-bold uppercase tracking-widest hover:bg-[var(--primary)]/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+                            >
+                                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                Generate 3 Questions
+                            </button>
                         </div>
                     </div>
 
@@ -212,7 +254,7 @@ export default function EvalPage() {
                                                             <div className="h-full bg-emerald-500" style={{ width: '92%' }} />
                                                         </div>
                                                         <p className="text-xs text-[var(--muted-foreground)] italic leading-relaxed pt-2">
-                                                            "The model correctly identified the key stages of formation but missed sub-glacial deposits detail."
+                                                            &quot;The model correctly identified the key stages of formation but missed sub-glacial deposits detail.&quot;
                                                         </p>
                                                     </div>
                                                 </div>

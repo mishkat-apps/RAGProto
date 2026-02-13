@@ -1,0 +1,123 @@
+﻿
+> necta-rag@0.1.0 lint
+> eslint
+
+
+D:\CodeBase\RagProto\scripts\analyze-retrieval.ts
+  10:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\CodeBase\RagProto\scripts\compare-chunks.ts
+   61:16  warning  'supabaseQuery' is defined but never used  @typescript-eslint/no-unused-vars
+   61:30  warning  'query' is defined but never used          @typescript-eslint/no-unused-vars
+   61:54  error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  194:19  error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  198:28  error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+
+D:\CodeBase\RagProto\src\app\admin\books\page.tsx
+  11:5   warning  'MoreVertical' is defined but never used  @typescript-eslint/no-unused-vars
+  16:5   warning  'Filter' is defined but never used        @typescript-eslint/no-unused-vars
+  17:5   warning  'HardDrive' is defined but never used     @typescript-eslint/no-unused-vars
+  18:5   warning  'Database' is defined but never used      @typescript-eslint/no-unused-vars
+  97:18  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\app\admin\eval\page.tsx
+    8:5    warning  'AlertCircle' is defined but never used                          @typescript-eslint/no-unused-vars
+    9:5    warning  'CheckCircle2' is defined but never used                         @typescript-eslint/no-unused-vars
+   37:40   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+   98:11   warning  'getScoreColor' is assigned a value but never used               @typescript-eslint/no-unused-vars
+  251:61   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  251:160  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+D:\CodeBase\RagProto\src\app\admin\layout.tsx
+  87:18  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+D:\CodeBase\RagProto\src\app\admin\layout.tsx:87:18
+  85 |                     <X className="w-5 h-5" />
+  86 |                 </button>
+> 87 |                 <SidebarContent />
+     |                  ^^^^^^^^^^^^^^ This component is created during render
+  88 |             </aside>
+  89 |
+  90 |             {/* Main content */}
+
+D:\CodeBase\RagProto\src\app\admin\layout.tsx:22:28
+  20 |     const pathname = usePathname();
+  21 |
+> 22 |     const SidebarContent = () => (
+     |                            ^^^^^^^
+> 23 |         <>
+     | ^^^^^^^^^^
+> 24 |             <div className="p-6 border-b border-[var(--border)]">
+     ΓÇª
+     | ^^^^^^^^^^
+> 62 |         </>
+     | ^^^^^^^^^^
+> 63 |     );
+     | ^^^^^^ The component is created during render here
+  64 |
+  65 |     return (
+  66 |         <div className="min-h-screen flex">  react-hooks/static-components
+
+D:\CodeBase\RagProto\src\app\admin\upload\page.tsx
+   5:67  warning  'BookOpen' is defined but never used      @typescript-eslint/no-unused-vars
+  63:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\CodeBase\RagProto\src\app\api\books\route.ts
+  7:27  warning  '_request' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\app\chat\page.tsx
+  97:13  error  Error: Cannot access variable before it is declared
+
+`startNewChat` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\CodeBase\RagProto\src\app\chat\page.tsx:97:13
+   95 |             setSelectedBookId(initialSessions[0].selectedBookId || '');
+   96 |         } else {
+>  97 |             startNewChat([]);
+      |             ^^^^^^^^^^^^ `startNewChat` accessed before it is declared
+   98 |         }
+   99 |
+  100 |         setIsLoaded(true);
+
+D:\CodeBase\RagProto\src\app\chat\page.tsx:121:5
+  119 |     const messages = activeSession?.messages || [];
+  120 |
+> 121 |     const startNewChat = (initialMsgs: Message[] = []) => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 122 |         const id = uuidv4();
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 123 |         const newSession: ChatSession = {
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 132 |         setInput('');
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 133 |     };
+      | ^^^^^^^ `startNewChat` is declared here
+  134 |
+  135 |     const deleteSession = (e: React.MouseEvent, id: string) => {
+  136 |         e.stopPropagation();  react-hooks/immutability
+
+D:\CodeBase\RagProto\src\app\layout.tsx
+  18:9  warning  Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+D:\CodeBase\RagProto\src\app\page.tsx
+  14:3  warning  'BarChart3' is defined but never used  @typescript-eslint/no-unused-vars
+  18:3  warning  'Mail' is defined but never used       @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\components\Toast.tsx
+  3:20  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\lib\genkit\flows.ts
+  175:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\lib\ingest\pipeline.ts
+  10:27  warning  'ChunkInsert' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\CodeBase\RagProto\src\lib\supabase\admin.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+Γ£û 29 problems (10 errors, 19 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

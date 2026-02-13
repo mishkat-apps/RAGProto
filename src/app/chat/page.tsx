@@ -56,6 +56,22 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [mode, setMode] = useState<'rag' | 'cag'>('rag');
+    const activeSession = sessions.find(s => s.id === currentSessionId);
+    const messages = activeSession?.messages || [];
+
+    const startNewChat = (initialMsgs: Message[] = []) => {
+        const id = uuidv4();
+        const newSession: ChatSession = {
+            id,
+            title: 'New Chat',
+            messages: initialMsgs,
+            updatedAt: Date.now()
+        };
+        setSessions(prev => [newSession, ...prev]);
+        setCurrentSessionId(id);
+        setSelectedBookId('');
+        setInput('');
+    };
 
     // Initial load: Migrate old data and load sessions
     useEffect(() => {
@@ -72,14 +88,14 @@ export default function ChatPage() {
             }
         } else if (oldHistory) {
             try {
-                const messages = JSON.parse(oldHistory);
-                if (Array.isArray(messages) && messages.length > 0) {
+                const msgs = JSON.parse(oldHistory);
+                if (Array.isArray(msgs) && msgs.length > 0) {
                     const id = uuidv4();
-                    const firstMsg = messages.find(m => m.role === 'user')?.content || 'New Chat';
+                    const firstMsg = msgs.find((m: Message) => m.role === 'user')?.content || 'New Chat';
                     initialSessions = [{
                         id,
                         title: firstMsg.slice(0, 40) + (firstMsg.length > 40 ? '...' : ''),
-                        messages,
+                        messages: msgs,
                         updatedAt: Date.now()
                     }];
                     localStorage.removeItem('necta_chat_history');
@@ -114,23 +130,6 @@ export default function ChatPage() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [currentSessionId, sessions]);
-
-    const activeSession = sessions.find(s => s.id === currentSessionId);
-    const messages = activeSession?.messages || [];
-
-    const startNewChat = (initialMsgs: Message[] = []) => {
-        const id = uuidv4();
-        const newSession: ChatSession = {
-            id,
-            title: 'New Chat',
-            messages: initialMsgs,
-            updatedAt: Date.now()
-        };
-        setSessions(prev => [newSession, ...prev]);
-        setCurrentSessionId(id);
-        setSelectedBookId('');
-        setInput('');
-    };
 
     const deleteSession = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();

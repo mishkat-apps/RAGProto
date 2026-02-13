@@ -60,8 +60,9 @@ export default function UploadPage() {
             setSubject('');
             setPublisher('');
             setFile(null);
-        } catch (error: any) {
-            setStatus({ type: 'error', message: error.message });
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Upload failed';
+            setStatus({ type: 'error', message });
         } finally {
             setUploading(false);
         }
@@ -90,7 +91,7 @@ export default function UploadPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Subject</label>
                                 <input
@@ -116,7 +117,7 @@ export default function UploadPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Language</label>
                                 <select
@@ -175,10 +176,10 @@ export default function UploadPage() {
                     <div
                         {...getRootProps()}
                         className={`h-full min-h-[300px] border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isDragActive
-                                ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-[1.02]'
-                                : file
-                                    ? 'border-emerald-400 bg-emerald-50/30'
-                                    : 'border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--muted)]'
+                            ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-[1.02]'
+                            : file
+                                ? 'border-emerald-400 bg-emerald-50/30'
+                                : 'border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--muted)]'
                             }`}
                     >
                         <input {...getInputProps()} />

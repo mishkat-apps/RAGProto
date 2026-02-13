@@ -11,6 +11,49 @@ const navLinks = [
     { href: '/admin/eval', icon: BarChart3, label: 'Evaluation' },
 ];
 
+const SidebarContent = ({ pathname, setSidebarOpen }: { pathname: string, setSidebarOpen: (open: boolean) => void }) => (
+    <>
+        <div className="p-6 border-b border-[var(--border)]">
+            <Link href="/" className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl gradient-btn flex items-center justify-center shadow-md">
+                    <BookOpen className="w-5 h-5 text-white" />
+                </div>
+                <span className="font-bold text-lg text-[var(--foreground)]">NECTA RAG</span>
+            </Link>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+            {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                    <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${isActive
+                            ? 'bg-[var(--primary)]/10 text-[var(--primary)] font-semibold'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
+                            }`}
+                    >
+                        <link.icon className="w-4 h-4" />
+                        {link.label}
+                    </Link>
+                );
+            })}
+        </nav>
+
+        <div className="p-4 border-t border-[var(--border)]">
+            <Link
+                href="/chat"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)]/5 transition-colors"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Chat
+            </Link>
+        </div>
+    </>
+);
+
 export default function AdminLayout({
     children,
 }: {
@@ -18,49 +61,6 @@ export default function AdminLayout({
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
-
-    const SidebarContent = () => (
-        <>
-            <div className="p-6 border-b border-[var(--border)]">
-                <Link href="/" className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl gradient-btn flex items-center justify-center shadow-md">
-                        <BookOpen className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="font-bold text-lg text-[var(--foreground)]">NECTA RAG</span>
-                </Link>
-            </div>
-
-            <nav className="flex-1 p-4 space-y-1">
-                {navLinks.map((link) => {
-                    const isActive = pathname === link.href;
-                    return (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={() => setSidebarOpen(false)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${isActive
-                                    ? 'bg-[var(--primary)]/10 text-[var(--primary)] font-semibold'
-                                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
-                                }`}
-                        >
-                            <link.icon className="w-4 h-4" />
-                            {link.label}
-                        </Link>
-                    );
-                })}
-            </nav>
-
-            <div className="p-4 border-t border-[var(--border)]">
-                <Link
-                    href="/chat"
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)]/5 transition-colors"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Chat
-                </Link>
-            </div>
-        </>
-    );
 
     return (
         <div className="min-h-screen flex">
@@ -84,7 +84,7 @@ export default function AdminLayout({
                 >
                     <X className="w-5 h-5" />
                 </button>
-                <SidebarContent />
+                <SidebarContent pathname={pathname} setSidebarOpen={setSidebarOpen} />
             </aside>
 
             {/* Main content */}

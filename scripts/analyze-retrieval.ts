@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function main() {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
 
     // 1. Text search for altitude
     const { data: textMatches } = await supabase
