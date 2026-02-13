@@ -15,6 +15,8 @@ import {
     Plus,
     History,
     Menu,
+    Zap,
+    Search,
 } from 'lucide-react';
 import type { Citation } from '@/lib/supabase/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -53,6 +55,7 @@ export default function ChatPage() {
     const [activeCitations, setActiveCitations] = useState<Citation[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [mode, setMode] = useState<'rag' | 'cag'>('rag');
 
     // Initial load: Migrate old data and load sessions
     useEffect(() => {
@@ -180,6 +183,7 @@ export default function ChatPage() {
                     question,
                     history,
                     filters: selectedBookId ? { book_id: selectedBookId } : undefined,
+                    mode,
                 }),
             });
 
@@ -279,8 +283,8 @@ export default function ChatPage() {
                             key={s.id}
                             onClick={() => setCurrentSessionId(s.id)}
                             className={`group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all ${s.id === currentSessionId
-                                    ? 'bg-purple-600/10 border border-purple-500/20 text-purple-100'
-                                    : 'hover:bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                ? 'bg-purple-600/10 border border-purple-500/20 text-purple-100'
+                                : 'hover:bg-[var(--muted)] text-[var(--muted-foreground)]'
                                 }`}
                         >
                             <div className="flex items-center gap-3 min-w-0">
@@ -322,6 +326,38 @@ export default function ChatPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {/* RAG / CAG Toggle */}
+                        <div className="flex items-center bg-[var(--muted)] rounded-xl p-1 border border-[var(--border)]">
+                            <button
+                                onClick={() => setMode('rag')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mode === 'rag'
+                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                                    : 'text-[var(--muted-foreground)] hover:text-white'
+                                    }`}
+                            >
+                                <Search className="w-3.5 h-3.5" />
+                                RAG
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setMode('cag');
+                                    // Force book selection if not already selected
+                                    if (!selectedBookId && books.length > 0) {
+                                        const bid = books[0].id;
+                                        setSelectedBookId(bid);
+                                        setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, selectedBookId: bid } : s));
+                                    }
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mode === 'cag'
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-500/20'
+                                    : 'text-[var(--muted-foreground)] hover:text-white'
+                                    }`}
+                            >
+                                <Zap className="w-3.5 h-3.5" />
+                                CAG
+                            </button>
+                        </div>
+
                         <select
                             value={selectedBookId}
                             onChange={(e) => {
@@ -331,7 +367,7 @@ export default function ChatPage() {
                             }}
                             className="px-3 py-2 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                         >
-                            <option value="">All Books</option>
+                            {mode === 'cag' ? null : <option value="">All Books</option>}
                             {books.map((b) => (
                                 <option key={b.id} value={b.id}>
                                     {b.title} (Form {b.form})
@@ -340,6 +376,16 @@ export default function ChatPage() {
                         </select>
                     </div>
                 </header>
+
+                {/* CAG Mode Banner */}
+                {mode === 'cag' && (
+                    <div className="px-6 py-2.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-500/20 flex items-center justify-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                            Full Textbook Mode — Entire book loaded into context
+                        </span>
+                    </div>
+                )}
 
                 {/* Messages Container */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar bg-[var(--background)]">
@@ -457,7 +503,9 @@ export default function ChatPage() {
                             <div className="glass rounded-3xl rounded-bl-md px-6 py-5 border border-white/5">
                                 <div className="flex items-center gap-3">
                                     <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-                                    <span className="text-sm md:text-base text-[var(--muted-foreground)] font-medium">Analyzing curriculum...</span>
+                                    <span className="text-sm md:text-base text-[var(--muted-foreground)] font-medium">
+                                        {mode === 'cag' ? 'Analyzing full textbook...' : 'Analyzing curriculum...'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
