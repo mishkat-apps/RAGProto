@@ -4,81 +4,102 @@ import type { MatchedChunk } from '@/lib/supabase/types';
 
 const log = createChildLogger('rerank');
 
+export interface RerankResult {
+    id: string;
+    score: number;
+}
+
 /**
- * Rerank chunks using Gemini as a judge.
- * Returns ordered chunk IDs (best first).
+ * Rerank chunks using the Vertex AI Ranking API (Discovery Engine).
+ * Returns ordered chunk IDs with relevance scores (best first).
+ */
+export async function rerankChunksWithScores(
+    question: string,
+    chunks: Array<MatchedChunk & { book_title: string; chapter: string; topic: string }>,
+    topK: number = 8
+): Promise<RerankResult[]> {
+    if (chunks.length === 0) return [];
+    if (chunks.length <= topK) {
+        return chunks.map((c) => ({ id: c.id, score: 1.0 }));
+    }
+
+    const env = getEnv();
+
+    // Build records for the Ranking API
+    const records = chunks.map((c) => ({
+        id: c.id,
+        title: [
+            c.chapter ? `Chapter: ${c.chapter}` : '',
+            c.topic ? `Topic: ${c.topic}` : '',
+            `pp. ${c.page_start || '?'}-${c.page_end || '?'}`,
+        ]
+            .filter(Boolean)
+            .join(' | '),
+        content: c.content,
+    }));
+
+    try {
+        const { getVertexAccessToken } = await import('@/lib/vertex/auth');
+        const accessToken = await getVertexAccessToken();
+
+        const endpoint = `https://discoveryengine.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/global/rankingConfigs/default_ranking_config:rank`;
+
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'X-Goog-User-Project': env.VERTEX_PROJECT_ID,
+            },
+            body: JSON.stringify({
+                model: env.RANKING_MODEL,
+                query: question,
+                topN: topK,
+                ignoreRecordDetailsInResponse: true,
+                records,
+            }),
+        });
+
+        if (!res.ok) {
+            const body = await res.text();
+            log.warn({ status: res.status, body: body.slice(0, 200) }, 'Ranking API call failed, falling back to similarity order');
+            return chunks.slice(0, topK).map((c) => ({ id: c.id, score: c.similarity }));
+        }
+
+        const data = await res.json();
+        const rankedRecords = data.records as Array<{ id: string; score: number }>;
+
+        if (!rankedRecords || rankedRecords.length === 0) {
+            log.warn('No records in Ranking API response, falling back');
+            return chunks.slice(0, topK).map((c) => ({ id: c.id, score: c.similarity }));
+        }
+
+        log.info(
+            { count: rankedRecords.length, topScore: rankedRecords[0]?.score },
+            'Ranking API returned results'
+        );
+
+        return rankedRecords.slice(0, topK).map((r) => ({
+            id: r.id,
+            score: r.score,
+        }));
+    } catch (err) {
+        log.warn(
+            { error: err instanceof Error ? err.message : String(err) },
+            'Rerank failed, using similarity order'
+        );
+        return chunks.slice(0, topK).map((c) => ({ id: c.id, score: c.similarity }));
+    }
+}
+
+/**
+ * Convenience wrapper that returns only ordered IDs (backward-compatible).
  */
 export async function rerankChunks(
     question: string,
     chunks: Array<MatchedChunk & { book_title: string; chapter: string; topic: string }>,
     topK: number = 8
 ): Promise<string[]> {
-    if (chunks.length === 0) return [];
-    if (chunks.length <= topK) return chunks.map((c) => c.id);
-
-    const env = getEnv();
-
-    const chunkSummaries = chunks
-        .map(
-            (c, i) =>
-                `[${i}] (id: ${c.id}) ${c.chapter ? `Chapter: ${c.chapter}, ` : ''}${c.topic ? `Topic: ${c.topic}, ` : ''}Pages ${c.page_start || '?'}-${c.page_end || '?'}\nContent: ${c.content.slice(0, 300)}...`
-        )
-        .join('\n\n');
-
-    const prompt = `You are a reranking judge. Given a student's question and a list of text chunks from a textbook, rank the chunks by relevance to the question.
-
-Question: "${question}"
-
-Chunks:
-${chunkSummaries}
-
-Return ONLY a JSON array of chunk IDs in order of relevance (most relevant first). Select the top ${topK} most relevant chunks. Do not include any explanation.
-
-Example output: ["id1", "id2", "id3"]`;
-
-    try {
-        const { GoogleAuth } = await import('google-auth-library');
-        const auth = new GoogleAuth({
-            scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-        });
-        const client = await auth.getClient();
-        const accessToken = await client.getAccessToken();
-
-        const endpoint = `https://${env.VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${env.VERTEX_LOCATION}/publishers/google/models/${env.GEMINI_MODEL}:generateContent`;
-
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken.token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 2048,
-                    responseMimeType: 'application/json',
-                },
-            }),
-        });
-
-        if (!res.ok) {
-            log.warn({ status: res.status }, 'Rerank call failed, falling back to similarity order');
-            return chunks.slice(0, topK).map((c) => c.id);
-        }
-
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!text) {
-            log.warn('No text in rerank response, falling back');
-            return chunks.slice(0, topK).map((c) => c.id);
-        }
-
-        const ids = JSON.parse(text) as string[];
-        return ids.slice(0, topK);
-    } catch (err) {
-        log.warn({ error: err instanceof Error ? err.message : String(err) }, 'Rerank failed, using similarity order');
-        return chunks.slice(0, topK).map((c) => c.id);
-    }
+    const results = await rerankChunksWithScores(question, chunks, topK);
+    return results.map((r) => r.id);
 }

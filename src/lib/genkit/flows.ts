@@ -1,7 +1,7 @@
 import { createChildLogger } from '@/lib/logger';
 import { getEnv } from '@/lib/env';
 import { retrieveChunks, enrichChunksWithContext } from '@/lib/rag/retrieval';
-import { rerankChunks } from '@/lib/rag/rerank';
+import { rerankChunksWithScores } from '@/lib/rag/rerank';
 import { CLASSIFY_PROMPT } from './prompts/classify';
 import { ANSWER_PROMPT, ANSWER_SYSTEM_PROMPT } from './prompts/answer';
 import type { AskRequest, AskResponse, Citation } from '@/lib/supabase/types';
@@ -62,16 +62,18 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
 
     // Step 4: Rerank (only if chunks exist)
     let finalChunks: Awaited<ReturnType<typeof enrichChunksWithContext>> = [];
+    let rerankerScores: number[] = [];
     if (rawChunks.length > 0) {
         const enrichedChunks = await enrichChunksWithContext(rawChunks);
-        const rerankedIds = await rerankChunks(question, enrichedChunks);
+        const reranked = await rerankChunksWithScores(question, enrichedChunks);
 
         // Select top chunks in reranked order
-        const topChunks = rerankedIds
-            .map((id) => enrichedChunks.find((c) => c.id === id))
+        const topChunks = reranked
+            .map((r) => enrichedChunks.find((c) => c.id === r.id))
             .filter(Boolean) as typeof enrichedChunks;
 
         finalChunks = topChunks.length > 0 ? topChunks : enrichedChunks.slice(0, 8);
+        rerankerScores = reranked.map((r) => r.score);
     }
 
     // Step 4: Group chunks by source metadata to avoid duplicate footnote numbers
@@ -136,13 +138,19 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
         page_end: s.page_end,
     }));
 
-    // Determine confidence
-    // Use top-3 similarity average for confidence (more representative than all chunks)
-    const topChunksSorted = [...finalChunks].sort((a, b) => b.similarity - a.similarity);
-    const top3 = topChunksSorted.slice(0, Math.min(3, topChunksSorted.length));
-    const avgSimilarity = top3.reduce((sum, c) => sum + c.similarity, 0) / top3.length;
-    const confidence: 'high' | 'medium' | 'low' =
-        avgSimilarity > 0.75 ? 'high' : avgSimilarity > 0.55 ? 'medium' : 'low';
+    // Determine confidence using reranker relevance scores (more reliable than embedding similarity)
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (rerankerScores.length > 0) {
+        const top3Scores = rerankerScores.slice(0, Math.min(3, rerankerScores.length));
+        const avgScore = top3Scores.reduce((a, b) => a + b, 0) / top3Scores.length;
+        confidence = avgScore > 0.7 ? 'high' : avgScore > 0.4 ? 'medium' : 'low';
+    } else if (finalChunks.length > 0) {
+        // Fallback to similarity if reranker didn't return scores
+        const topChunksSorted = [...finalChunks].sort((a, b) => b.similarity - a.similarity);
+        const top3 = topChunksSorted.slice(0, Math.min(3, topChunksSorted.length));
+        const avgSimilarity = top3.reduce((sum, c) => sum + c.similarity, 0) / top3.length;
+        confidence = avgSimilarity > 0.75 ? 'high' : avgSimilarity > 0.55 ? 'medium' : 'low';
+    }
 
     // Log query
     try {

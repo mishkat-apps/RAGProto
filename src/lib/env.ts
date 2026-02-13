@@ -15,6 +15,7 @@ const envSchema = z.object({
     VERTEX_LOCATION: z.string().default('us-central1'),
     VERTEX_EMBEDDING_MODEL: z.string().default('text-embedding-005'),
     GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+    RANKING_MODEL: z.string().default('semantic-ranker-512@003'),
 
     // Embedding dimensions
     EMBEDDING_DIM: z.coerce.number().int().positive().default(768),
