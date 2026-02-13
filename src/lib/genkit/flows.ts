@@ -22,11 +22,26 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
 
     log.info({ question, filters, historyCount: history.length }, 'Starting answerNECTAQuestion flow');
 
-    // Step 1: Classify question type
-    const questionType = await classifyQuestion(question);
-    log.info({ questionType }, 'Question classified');
+    // Step 1: Classify user intent
+    const intent = await classifyIntent(question);
+    log.info({ intent }, 'Intent classified');
 
-    // Step 2: Retrieve chunks
+    // Step 2: Handle non-RAG intents early
+    if (intent === 'greeting' || intent === 'conversational') {
+        const historyStr = history.length > 0
+            ? history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')
+            : 'No previous history.';
+
+        const prompt = ANSWER_PROMPT
+            .replace('{context}', 'No specific academic context needed.')
+            .replace('{history}', historyStr)
+            .replace('{question}', question);
+
+        const answer = await callGemini(prompt, ANSWER_SYSTEM_PROMPT);
+        return { answer, citations: [], confidence: 'high' };
+    }
+
+    // Step 3: Retrieve chunks for academic queries or follow-ups
     const rawChunks = await retrieveChunks(question, {
         bookId: filters?.book_id,
         subject: filters?.subject,
@@ -34,9 +49,10 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
         topK,
     });
 
-    log.info({ retrievedCount: rawChunks.length }, 'Chunks retrieved');
+    log.info({ retrievedCount: rawChunks.length, intent }, 'Chunks retrieved');
 
-    if (rawChunks.length === 0) {
+    // For academic queries, if no chunks found, return refusal
+    if (intent === 'academic_query' && rawChunks.length === 0) {
         return {
             answer: 'I could not find any relevant information in the uploaded textbooks to answer your question.',
             citations: [],
@@ -44,16 +60,19 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
         };
     }
 
-    // Step 3: Rerank
-    const enrichedChunks = await enrichChunksWithContext(rawChunks);
-    const rerankedIds = await rerankChunks(question, enrichedChunks);
+    // Step 4: Rerank (only if chunks exist)
+    let finalChunks: Awaited<ReturnType<typeof enrichChunksWithContext>> = [];
+    if (rawChunks.length > 0) {
+        const enrichedChunks = await enrichChunksWithContext(rawChunks);
+        const rerankedIds = await rerankChunks(question, enrichedChunks);
 
-    // Select top chunks in reranked order
-    const topChunks = rerankedIds
-        .map((id) => enrichedChunks.find((c) => c.id === id))
-        .filter(Boolean) as typeof enrichedChunks;
+        // Select top chunks in reranked order
+        const topChunks = rerankedIds
+            .map((id) => enrichedChunks.find((c) => c.id === id))
+            .filter(Boolean) as typeof enrichedChunks;
 
-    const finalChunks = topChunks.length > 0 ? topChunks : enrichedChunks.slice(0, 8);
+        finalChunks = topChunks.length > 0 ? topChunks : enrichedChunks.slice(0, 8);
+    }
 
     // Step 4: Group chunks by source metadata to avoid duplicate footnote numbers
     const sourcesMap = new Map<string, {
@@ -87,21 +106,23 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
 
     const groupedSources = Array.from(sourcesMap.values());
 
-    const contextStr = groupedSources
-        .map(
-            (s, i) =>
-                `[Source ${i + 1}] (${s.chapter}, ${s.topic}, pp. ${s.page_start || '?'}–${s.page_end || '?'})\n${s.content.join('\n\n')}`
-        )
-        .join('\n\n---\n\n');
+    const contextStr = groupedSources.length > 0
+        ? groupedSources
+            .map(
+                (s, i) =>
+                    `[Source ${i + 1}] (${s.chapter}, ${s.topic}, pp. ${s.page_start || '?'}–${s.page_end || '?'})\n${s.content.join('\n\n')}`
+            )
+            .join('\n\n---\n\n')
+        : 'No specific context chunks provided for this turnover.';
 
     const historyStr = history.length > 0
         ? history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')
         : 'No previous history.';
 
-    const prompt = ANSWER_PROMPT.replace('{questionType}', questionType)
-        .replace('{question}', question)
+    const prompt = ANSWER_PROMPT
+        .replace('{context}', contextStr)
         .replace('{history}', historyStr)
-        .replace('{context}', contextStr);
+        .replace('{question}', question);
 
     const answer = await callGemini(prompt, ANSWER_SYSTEM_PROMPT);
 
@@ -143,15 +164,16 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
     return { answer, citations, confidence };
 }
 
-async function classifyQuestion(question: string): Promise<string> {
+async function classifyIntent(question: string): Promise<string> {
     const prompt = CLASSIFY_PROMPT.replace('{question}', question);
     try {
         const result = await callGemini(prompt);
         const type = result.trim().toLowerCase();
-        const validTypes = ['definition', 'explanation', 'essay', 'compare', 'other'];
-        return validTypes.includes(type) ? type : 'other';
+        const validTypes = ['academic_query', 'follow_up', 'greeting', 'conversational', 'other'];
+        // Default to academic_query if Gemini returns something else but it looks like a question
+        return validTypes.includes(type) ? type : 'academic_query';
     } catch {
-        return 'other';
+        return 'academic_query';
     }
 }
 

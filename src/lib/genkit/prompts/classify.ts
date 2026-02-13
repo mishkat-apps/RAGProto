@@ -1,14 +1,14 @@
 /**
  * Prompt template for classifying question types.
  */
-export const CLASSIFY_PROMPT = `You are a question classifier for NECTA textbook questions. Classify the following question into ONE of these types:
+export const CLASSIFY_PROMPT = `You are an intent classifier for NECTA Study Assistant. Categorize the user's input into exactly ONE of the following types:
 
-- definition: The question asks for the meaning or definition of a term
-- explanation: The question asks to explain a concept or process
-- essay: The question requires a long-form answer (describe, discuss, analyze)
-- compare: The question asks to compare, contrast, or differentiate
-- other: The question doesn't fit the above categories
+- academic_query: The user is asking a specific academic or subject-related question (e.g., "What is a plateau?", "Explain photosynthesis").
+- follow_up: The user is asking to do something with the previous answer (e.g., "Translate above into Swahili", "Summarize that", "Give me more info").
+- greeting: The user is saying hi, hello, or other general pleasantries.
+- conversational: The user is making small talk or asking general questions not necessarily requiring textbook context (e.g., "How are you?", "Who are you?").
+- other: Anything else that doesn't fit.
 
-Question: "{question}"
+Input: "{question}"
 
-Respond with ONLY the type (one word, lowercase).`;
+Respond with ONLY the type (one of the bullet points above, lowercase).`;
