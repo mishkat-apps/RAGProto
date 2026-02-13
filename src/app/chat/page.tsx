@@ -22,6 +22,8 @@ import type { Citation } from '@/lib/supabase/types';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ThemeToggle } from '@/components/ThemeToggle';
+
 
 interface Message {
     role: 'user' | 'assistant';
@@ -444,8 +446,10 @@ export default function ChatPage() {
                                 </option>
                             ))}
                         </select>
+                        <ThemeToggle />
                     </div>
                 </header>
+
 
                 {/* CAG Mode Banner */}
                 {mode === 'cag' && (
@@ -460,29 +464,67 @@ export default function ChatPage() {
                 {/* Messages Container */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar bg-[var(--background)]">
                     {messages.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-full text-center max-w-2xl mx-auto px-4">
-                            <div className="w-24 h-24 rounded-3xl gradient-tz opacity-20 flex items-center justify-center mb-8 animate-float">
-                                <Sparkles className="w-10 h-10 text-white" />
+                        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center max-w-4xl mx-auto px-4 py-12">
+                            <div className="relative mb-12">
+                                <div className="w-24 h-24 rounded-[2.5rem] gradient-tz flex items-center justify-center relative z-10 shadow-2xl animate-float">
+                                    <Sparkles className="w-10 h-10 text-white" />
+                                </div>
+                                <div className="absolute inset-0 bg-[var(--primary)] blur-3xl opacity-20 animate-pulse" />
                             </div>
-                            <h2 className="text-2xl md:text-3xl font-bold mb-4 gradient-text">Ask a Textbook Question</h2>
-                            <p className="text-[var(--muted-foreground)] text-base md:text-lg mb-10 leading-relaxed">
-                                Our AI tutor will search through the NECTA curriculum to give you precise answers with citations.
+
+                            <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">
+                                <span className="gradient-text tracking-tighter">Welcome to AskMwalimu</span>
+                            </h2>
+                            <p className="text-[var(--muted-foreground)] text-lg md:text-xl mb-12 leading-relaxed max-w-2xl font-medium">
+                                Your personal AI tutor for the NECTA curriculum. High-precision answers with direct textbook citations.
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full">
-                                {[
-                                    'What is geographic research?',
-                                    'Explain the formation of fold mountains',
-                                    'What are the types of rainfall?',
-                                    'Define the term "ecosystem"',
-                                ].map((q) => (
-                                    <button
-                                        key={q}
-                                        onClick={() => setInput(q)}
-                                        className="px-5 py-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] text-sm text-left hover:border-[var(--primary)]/40 hover:shadow-md transition-all hover:-translate-y-0.5 active:scale-[0.98]"
-                                    >
-                                        {q}
-                                    </button>
-                                ))}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-16">
+                                <FeatureHighlight
+                                    icon={<Zap className="w-5 h-5" />}
+                                    title="Fast & Accurate"
+                                    desc="Neural search across thousands of pages in milliseconds."
+                                />
+                                <FeatureHighlight
+                                    icon={<FileText className="w-5 h-5" />}
+                                    title="Direct Citations"
+                                    desc="Every answer includes exact textbook page numbers."
+                                />
+                                <FeatureHighlight
+                                    icon={<BookOpen className="w-5 h-5" />}
+                                    title="Multi-Book Context"
+                                    desc="Connect knowledge across different subjects and forms."
+                                />
+                            </div>
+
+                            <div className="w-full space-y-4">
+                                <div className="flex items-center gap-2 mb-4 px-2">
+                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Try a sample query</span>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {[
+                                        { q: 'What is geographic research?', cat: 'Geography' },
+                                        { q: 'Explain the formation of fold mountains', cat: 'Geography' },
+                                        { q: 'What are the types of rainfall?', cat: 'Meteorology' },
+                                        { q: 'Define the term "ecosystem"', cat: 'Biology' },
+                                    ].map((item) => (
+                                        <button
+                                            key={item.q}
+                                            onClick={() => setInput(item.q)}
+                                            className="group px-6 py-5 rounded-[2rem] border border-[var(--border)] bg-[var(--card)] text-sm text-left hover:border-[var(--primary)] transition-all hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] relative overflow-hidden"
+                                        >
+                                            <div className="flex flex-col gap-1 relative z-10">
+                                                <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">{item.cat}</span>
+                                                <span className="font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">{item.q}</span>
+                                            </div>
+                                            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-10 transition-opacity">
+                                                <ChevronRight className="w-12 h-12" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -661,6 +703,20 @@ export default function ChatPage() {
                     </div>
                 </>
             )}
+        </div>
+    );
+}
+
+function FeatureHighlight({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+    return (
+        <div className="flex flex-col items-center gap-3 p-6 rounded-[2rem] glass border border-[var(--border)]/30 hover:border-[var(--primary)]/30 transition-all group">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
+                {icon}
+            </div>
+            <div className="space-y-1">
+                <h3 className="font-bold text-[var(--foreground)]">{title}</h3>
+                <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">{desc}</p>
+            </div>
         </div>
     );
 }

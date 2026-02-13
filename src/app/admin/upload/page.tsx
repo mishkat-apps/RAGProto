@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2, BookOpen } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function UploadPage() {
     const [title, setTitle] = useState('');

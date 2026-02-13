@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 /**
  * GET /api/books — List all books with their ingest job status
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
     try {
         const supabase = getSupabaseAdmin();
 

@@ -3,13 +3,42 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Upload, Library, BarChart3, ArrowLeft, Menu, X } from 'lucide-react';
+import { BookOpen, Upload, Library, BarChart3, ArrowLeft, Menu, X, ChevronRight } from 'lucide-react';
 
 const navLinks = [
     { href: '/admin/upload', icon: Upload, label: 'Upload Textbook' },
     { href: '/admin/books', icon: Library, label: 'Books' },
     { href: '/admin/eval', icon: BarChart3, label: 'Evaluation' },
 ];
+
+const Breadcrumbs = ({ pathname }: { pathname: string }) => {
+    const paths = pathname.split('/').filter(Boolean);
+    return (
+        <nav className="flex items-center gap-2 mb-6 text-xs font-semibold uppercase tracking-wider overflow-x-auto whitespace-nowrap pb-2 md:pb-0">
+            <Link href="/" className="text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors">
+                Home
+            </Link>
+            {paths.map((path, idx) => {
+                const href = `/${paths.slice(0, idx + 1).join('/')}`;
+                const isLast = idx === paths.length - 1;
+                const label = path.charAt(0).toUpperCase() + path.slice(1);
+
+                return (
+                    <div key={path} className="flex items-center gap-2">
+                        <ChevronRight className="w-3 h-3 text-[var(--muted-foreground)]/40 flex-shrink-0" />
+                        {isLast ? (
+                            <span className="text-[var(--primary)]">{label}</span>
+                        ) : (
+                            <Link href={href} className="text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors">
+                                {label}
+                            </Link>
+                        )}
+                    </div>
+                );
+            })}
+        </nav>
+    );
+};
 
 const SidebarContent = ({ pathname, setSidebarOpen }: { pathname: string, setSidebarOpen: (open: boolean) => void }) => (
     <>
@@ -99,7 +128,10 @@ export default function AdminLayout({
                     </button>
                     <span className="font-semibold text-sm text-[var(--foreground)]">NECTA RAG Admin</span>
                 </div>
-                <div className="max-w-5xl mx-auto p-4 md:p-8">{children}</div>
+                <div className="max-w-5xl mx-auto p-4 md:p-8">
+                    <Breadcrumbs pathname={pathname} />
+                    {children}
+                </div>
             </main>
         </div>
     );

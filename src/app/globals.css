@@ -31,11 +31,27 @@
   --success: #22C55E;
   --warning: #F59E0B;
 
-  /* === Tanzania Gradient Stops === */
+  /* === Tanzania Flag Colors === */
   --tz-green: #1EB53A;
   --tz-gold: #FCD116;
   --tz-blue: #00A3DD;
+  --tz-black: #000000;
+
+  /* === Dynamic Theme Gradients === */
+  --gradient-from: var(--tz-green);
+  --gradient-via: #17A085;
+  /* Default standard via */
+  --gradient-to: var(--tz-blue);
 }
+
+[data-theme="tanzania"] {
+  --gradient-from: var(--tz-green);
+  --gradient-via: var(--tz-gold);
+  --gradient-to: var(--tz-blue);
+  /* Use black for some buttons or icons if contextually appropriate, 
+     but for the main 4-color gradient we'll define a specific helper */
+}
+
 
 * {
   border-color: var(--border);
@@ -84,7 +100,19 @@ h6 {
 
 /* Tanzania gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, var(--tz-green) 0%, var(--tz-gold) 50%, var(--tz-blue) 100%);
+  background: linear-gradient(135deg, var(--gradient-from) 0%, var(--gradient-via) 50%, var(--gradient-to) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="tanzania"] .gradient-text {
+  /* 4-color flag gradient: Green, Yellow, Black, Blue */
+  background: linear-gradient(135deg,
+      var(--tz-green) 0%,
+      var(--tz-gold) 33%,
+      var(--tz-black) 66%,
+      var(--tz-blue) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -92,13 +120,27 @@ h6 {
 
 /* Tanzania gradient background */
 .gradient-tz {
-  background: linear-gradient(135deg, var(--tz-green) 0%, var(--tz-gold) 50%, var(--tz-blue) 100%);
+  background: linear-gradient(135deg, var(--gradient-from) 0%, var(--gradient-via) 50%, var(--gradient-to) 100%);
 }
 
-/* Single-color accent gradient (green → teal) for buttons */
-.gradient-btn {
-  background: linear-gradient(135deg, #1EB53A 0%, #17A085 50%, #00A3DD 100%);
+[data-theme="tanzania"] .gradient-tz {
+  background: linear-gradient(135deg,
+      var(--tz-green) 0%,
+      var(--tz-gold) 33%,
+      var(--tz-black) 66%,
+      var(--tz-blue) 100%);
 }
+
+/* Single-color accent gradient for buttons */
+.gradient-btn {
+  background: linear-gradient(135deg, var(--gradient-from) 0%, var(--gradient-via) 50%, var(--gradient-to) 100%);
+}
+
+[data-theme="tanzania"] .gradient-btn {
+  /* Slightly more punchy for the TZ theme buttons */
+  background: linear-gradient(135deg, var(--tz-green) 0%, var(--tz-black) 100%);
+}
+
 
 /* Animations */
 @keyframes fadeIn {

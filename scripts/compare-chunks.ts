@@ -58,17 +58,6 @@ interface QueryResult {
     elapsed_ms: number;
 }
 
-async function supabaseQuery(): Promise<unknown> {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
-        method: 'POST',
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-        },
-    });
-    return res.json();
-}
 
 async function getBooks(): Promise<BookInfo[]> {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/books?select=id,title,subject,form,created_at&order=created_at.asc`, {
@@ -195,7 +184,23 @@ async function main() {
         timestamp: string;
         old_book: { id: string, title: string, stats: ChunkStats };
         new_book: { id: string, title: string, stats: ChunkStats };
-        comparisons: any[];
+        comparisons: Array<{
+            query: string;
+            old: {
+                confidence: string;
+                citations_count: number;
+                elapsed_ms: number;
+                answer: string;
+                citation_details: unknown[];
+            };
+            new: {
+                confidence: string;
+                citations_count: number;
+                elapsed_ms: number;
+                answer: string;
+                citation_details: unknown[];
+            };
+        }>;
     } = {
         timestamp: new Date().toISOString(),
         old_book: { id: oldBook.id, title: oldBook.title, stats: oldStats },

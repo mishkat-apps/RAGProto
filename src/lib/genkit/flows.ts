@@ -172,7 +172,7 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
             citations,
             confidence,
         });
-    } catch (err) {
+    } catch {
         log.warn('Failed to log query (non-fatal)');
     }
 

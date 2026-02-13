@@ -5,8 +5,6 @@ import {
     Play,
     ChevronDown,
     ChevronUp,
-    AlertCircle,
-    CheckCircle2,
     Loader2,
     BarChart3,
     ClipboardList,
@@ -101,11 +99,6 @@ export default function EvalPage() {
         }
     };
 
-    const getScoreColor = (score: number) => {
-        if (score >= 4) return 'text-emerald-600';
-        if (score >= 3) return 'text-amber-600';
-        return 'text-red-600';
-    };
 
     return (
         <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">

@@ -11,13 +11,13 @@ import {
   Sparkles,
   MessageSquare,
   FileUp,
-  BarChart3,
   Twitter,
   Github,
   Linkedin,
-  Mail,
   ChevronRight
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+
 
 export default function LandingPage() {
   return (
@@ -39,9 +39,11 @@ export default function LandingPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <button className="hidden sm:block text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] px-5 py-2.5 rounded-xl transition-all">Sign In</button>
             <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 transition-all active:scale-95">Sign Up</button>
           </div>
+
         </div>
       </header>
 

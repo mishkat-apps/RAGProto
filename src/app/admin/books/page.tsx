@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface Book {
     id: string;
@@ -187,10 +188,21 @@ export default function BooksPage() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <StatCard label="Total Books" value={books.length} icon={<Library className="w-4 h-4" />} />
-                <StatCard label="Completed" value={books.filter(b => b.latest_job?.status === 'succeeded').length} color="text-emerald-600" icon={<CheckCircle2 className="w-4 h-4" />} />
-                <StatCard label="In Processing" value={books.filter(b => b.latest_job?.status === 'running' || b.latest_job?.status === 'queued').length} color="text-blue-600" icon={<RefreshCcw className="w-4 h-4" />} />
-                <StatCard label="Failed" value={books.filter(b => b.latest_job?.status === 'failed').length} color="text-red-600" icon={<AlertCircle className="w-4 h-4" />} />
+                {loading && books.length === 0 ? (
+                    <>
+                        <Skeleton className="h-28 rounded-[2rem]" />
+                        <Skeleton className="h-28 rounded-[2rem]" />
+                        <Skeleton className="h-28 rounded-[2rem]" />
+                        <Skeleton className="h-28 rounded-[2rem]" />
+                    </>
+                ) : (
+                    <>
+                        <StatCard label="Total Books" value={books.length} icon={<Library className="w-4 h-4" />} />
+                        <StatCard label="Completed" value={books.filter(b => b.latest_job?.status === 'succeeded').length} color="text-emerald-600" icon={<CheckCircle2 className="w-4 h-4" />} />
+                        <StatCard label="In Processing" value={books.filter(b => b.latest_job?.status === 'running' || b.latest_job?.status === 'queued').length} color="text-blue-600" icon={<RefreshCcw className="w-4 h-4" />} />
+                        <StatCard label="Failed" value={books.filter(b => b.latest_job?.status === 'failed').length} color="text-red-600" icon={<AlertCircle className="w-4 h-4" />} />
+                    </>
+                )}
             </div>
 
             {/* Toolbar */}
@@ -214,11 +226,11 @@ export default function BooksPage() {
             </div>
 
             {loading && books.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-32 glass rounded-[2.5rem] border border-[var(--border)]">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.3s]" />
-                        <div className="w-3 h-3 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.15s]" />
-                        <div className="w-3 h-3 rounded-full bg-[var(--primary)] animate-bounce" />
+                <div className="space-y-4">
+                    <Skeleton className="h-64 rounded-[2rem]" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 xl:hidden">
+                        <Skeleton className="h-64 rounded-[2.5rem]" />
+                        <Skeleton className="h-64 rounded-[2.5rem]" />
                     </div>
                 </div>
             ) : filteredBooks.length === 0 ? (
