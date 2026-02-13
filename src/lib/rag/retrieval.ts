@@ -15,9 +15,10 @@ export async function retrieveChunks(
         subject?: string;
         form?: number;
         topK?: number;
+        similarityThreshold?: number;
     } = {}
 ): Promise<MatchedChunk[]> {
-    const { bookId, subject, form, topK = 20 } = opts;
+    const { bookId, subject, form, topK = 12, similarityThreshold = 0.5 } = opts;
 
     // Generate query embedding
     const queryEmbedding = await generateQueryEmbedding(question);
@@ -27,6 +28,7 @@ export async function retrieveChunks(
     const { data, error } = await supabase.rpc('match_chunks', {
         query_embedding: queryEmbedding,
         match_count: topK,
+        similarity_threshold: similarityThreshold,
         filter_book_id: bookId || null,
         filter_subject: subject || null,
         filter_form: form || null,
@@ -43,7 +45,7 @@ export async function retrieveChunks(
         const topSim = results[0]?.similarity?.toFixed(4);
         const botSim = results[results.length - 1]?.similarity?.toFixed(4);
         log.info(
-            { count: results.length, topSimilarity: topSim, bottomSimilarity: botSim },
+            { count: results.length, topSimilarity: topSim, bottomSimilarity: botSim, threshold: similarityThreshold },
             'Chunks retrieved from vector search'
         );
     } else {
@@ -51,6 +53,70 @@ export async function retrieveChunks(
     }
 
     return results;
+}
+
+/**
+ * Expand results with sibling chunks from the same section.
+ *
+ * If chunk A belongs to section S and was retrieved, this fetches other
+ * chunks in section S that weren't already in the results. This ensures
+ * that topics spanning multiple chunks are fully represented.
+ *
+ * Caps the total at `maxTotal` to avoid over-expansion.
+ */
+export async function expandWithSiblingChunks(
+    chunks: MatchedChunk[],
+    maxTotal: number = 15
+): Promise<MatchedChunk[]> {
+    if (chunks.length === 0) return [];
+
+    // Collect section IDs from the retrieved chunks
+    const sectionIds = [...new Set(
+        chunks
+            .map((c) => c.section_id)
+            .filter((id): id is string => id !== null)
+    )];
+
+    if (sectionIds.length === 0) return chunks;
+
+    const existingIds = new Set(chunks.map((c) => c.id));
+    const spotsAvailable = maxTotal - chunks.length;
+
+    if (spotsAvailable <= 0) return chunks;
+
+    const supabase = getSupabaseAdmin();
+
+    // Fetch sibling chunks from the same sections
+    const { data: siblings, error } = await supabase
+        .from('chunks')
+        .select('id, book_id, section_id, chunk_type, content, page_start, page_end, tokens_estimate, keywords, content_hash')
+        .in('section_id', sectionIds)
+        .not('embedding', 'is', null)
+        .order('page_start', { ascending: true })
+        .limit(spotsAvailable + chunks.length); // fetch enough to filter
+
+    if (error) {
+        log.warn({ error: error.message }, 'Failed to fetch sibling chunks, continuing without expansion');
+        return chunks;
+    }
+
+    // Filter to only truly new chunks
+    const newSiblings = (siblings || [])
+        .filter((s) => !existingIds.has(s.id))
+        .slice(0, spotsAvailable)
+        .map((s) => ({
+            ...s,
+            similarity: 0, // Siblings don't have a similarity score from vector search
+        })) as MatchedChunk[];
+
+    if (newSiblings.length > 0) {
+        log.info(
+            { added: newSiblings.length, fromSections: sectionIds.length },
+            'Expanded results with sibling chunks'
+        );
+    }
+
+    return [...chunks, ...newSiblings];
 }
 
 /**

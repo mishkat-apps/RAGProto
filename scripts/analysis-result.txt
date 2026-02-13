@@ -1,0 +1,82 @@
+=== TEXT SEARCH: Chunks containing "altitude" ===
+Found 12 chunks
+  [explanation] pp.27-28 | 227tok | Classification of climate of the world is done to understand how a combination of different climatic
+  [explanation] pp.29-29 | 182tok | Temperate climate is also known as *mesothermal* or *middle latitude climate*. It is found between 3
+  [explanation] pp.29-29 | 189tok | The cold climate zone lies between 40° and 65° North and South of the Equator and the poles. It incl
+  [explanation] pp.30-31 | 273tok | Altitude is the height of a point above mean sea level. Earth's atmosphere is mainly heated through 
+  [explanation] pp.30-31 | 92tok | One would expect higher temperature at higher altitudes, but this is not what happens. Water vapour 
+  [explanation] pp.37-39 | 311tok | Rainfall may be defined as the droplets of water falling from the atmosphere after condensation. Whe
+  [explanation] pp.40-40 | 304tok | The equatorial climate region, which is also known as the equatorial climatic belt extends from 0° t
+  [explanation] pp.79-79 | 174tok | Generally, temperature decreases with an increase in altitude whereas precipitation increases with a
+  [explanation] pp.79-80 | 245tok | The vegetation varies with altitude. At the base, there are Steppe grasslands, which are open grassl
+  [explanation] pp.84-85 | 317tok | **Choose the correct answer among the alternatives provided:**  (i) You are asked to help a Form Two
+  [explanation] pp.84-85 | 131tok | (c) Prevailing winds, latitude, rainfall, hygrometer and aspect (d) Altitude, temperature and the Ea
+  [explanation] pp.90-90 | 324tok | The highland or mountainous areas of East Africa such as the upper slopes of Mount Kilimanjaro, Moun
+
+=== CHUNK DATABASE STATS ===
+Total chunks: 527
+Embedded chunks: 527 | Avg: 197 | Min: 32 | Max: 416 tokens
+Token distribution:
+  0-50: 24 (4.6%)
+  50-100: 81 (15.4%)
+  100-200: 168 (31.9%)
+  200-300: 153 (29.0%)
+  300-500: 101 (19.2%)
+  500-1000: 0 (0.0%)
+  1000-inf: 0 (0.0%)
+Chunk type distribution:
+  explanation: 487 (92.4%)
+  exercise: 3 (0.6%)
+  definition: 36 (6.8%)
+  summary: 1 (0.2%)
+
+=== SECTIONS NEAR PAGES 28-34 ===
+      [L2] "Section B" pp.25-26
+      [L2] "Section C" pp.26-26
+    [L1] "Chapter Two - Climate and natural climate regions" pp.26-26
+      [L2] "Introduction" pp.26-27
+      [L2] "The concepts of climate and natural climate regions" pp.27-27
+      [L2] "Types of world climate and their characteristics" pp.27-28
+        [L3] "Tropical climate" pp.28-28
+        [L3] "Dry climate" pp.28-29
+      [L2] "Temperate climate" pp.29-29
+      [L2] "Cold climate" pp.29-29
+      [L2] "Polar climate" pp.29-30
+      [L2] "Geographical factors affecting climate" pp.30-30
+      [L2] "Latitude" pp.30-30
+      [L2] "Altitude" pp.30-31
+        [L3] "Distance from the sea" pp.31-32
+      [L2] "Prevailing winds" pp.32-33
+      [L2] "Ocean currents" pp.33-33
+      [L2] "Aspect" pp.33-34
+      [L2] "Vegetation" pp.34-34
+      [L2] "Soils" pp.34-34
+      [L2] "Human influence" pp.34-35
+      [L2] "Temperature" pp.35-35
+      [L2] "Atmospheric pressure" pp.35-37
+
+=== CHUNKS ON PAGES 28-34 ===
+Found 20 chunks on pages 28-34
+  [explanation] pp.28-28 | 193tok | Tropical climate is a non-arid climate in which the mean temperature is above 18°C throughout the ye
+  [explanation] pp.28-29 | 259tok | This type of climate experiences very little rainfall and has, therefore, no permanent source of str
+  [explanation] pp.28-29 | 182tok | go several years with no rainfall. A dry climate often has greater evaporation than precipitation. T
+  [explanation] pp.29-29 | 182tok | Temperate climate is also known as *mesothermal* or *middle latitude climate*. It is found between 3
+  [explanation] pp.29-29 | 189tok | The cold climate zone lies between 40° and 65° North and South of the Equator and the poles. It incl
+  [explanation] pp.29-30 | 281tok | Polar climate is found across the continents that border the Arctic Ocean, Greenland and Antarctica.
+  [explanation] pp.30-30 | 36tok | Climate of a particular place can differ when compared to another. There are various geographical fa
+  [explanation] pp.30-30 | 267tok | Latitude is the angular distance north and south of the Equator. Latitudes do affect the temperature
+  [explanation] pp.30-31 | 273tok | Altitude is the height of a point above mean sea level. Earth's atmosphere is mainly heated through 
+  [explanation] pp.30-31 | 92tok | One would expect higher temperature at higher altitudes, but this is not what happens. Water vapour 
+  [explanation] pp.31-32 | 265tok | Heating properties of land and water surface vary considerably because they react differently to sol
+  [explanation] pp.31-32 | 102tok | Onshore winds bring warmth to coastal regions during the winter. This warming influence is confined 
+  [explanation] pp.32-33 | 326tok | Prevailing winds are winds that blow consistently in a given direction over a particular region on E
+  [explanation] pp.32-33 | 293tok | At night, the situation operates in reverse. The air over the sea or ocean is now warmer than the ai
+  [explanation] pp.33-33 | 344tok | An ocean current is a continuous and directed movement of sea water generated by a number of forces 
+  [definition] pp.33-34 | 319tok | Aspect refers to the direction in which a slope faces the Sun. Figure 2.5 shows how aspect affects t
+  [definition] pp.33-34 | 57tok | Geography for Secondary Schools Book Four(T1E).indd 29                                              
+  [explanation] pp.34-34 | 64tok | Vegetation affects the temperature of a particular place significantly. Areas with dense forest cove
+  [explanation] pp.34-34 | 82tok | Light soils reflect more heat than darker soils, which are better heat absorbers. Such soil differen
+  [explanation] pp.34-35 | 165tok | Human activities such as settlements, agriculture, industries and construction of dams influence cli
+
+=== BOOKS ===
+  Geography Form 4 Textbook | Geography | Form 4

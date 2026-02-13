@@ -1,6 +1,6 @@
 import { createChildLogger } from '@/lib/logger';
 import { getEnv } from '@/lib/env';
-import { retrieveChunks, enrichChunksWithContext } from '@/lib/rag/retrieval';
+import { retrieveChunks, expandWithSiblingChunks, enrichChunksWithContext } from '@/lib/rag/retrieval';
 import { rerankChunksWithScores } from '@/lib/rag/rerank';
 import { CLASSIFY_PROMPT } from './prompts/classify';
 import { ANSWER_PROMPT, ANSWER_SYSTEM_PROMPT } from './prompts/answer';
@@ -18,7 +18,7 @@ const log = createChildLogger('genkit-flows');
  * 5) If context weak: refuse and ask clarifying question
  */
 export async function answerNECTAQuestion(request: AskRequest): Promise<AskResponse> {
-    const { question, filters, history = [], topK = 20 } = request;
+    const { question, filters, history = [], topK = 12 } = request;
 
     log.info({ question, filters, historyCount: history.length }, 'Starting answerNECTAQuestion flow');
 
@@ -42,14 +42,17 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
     }
 
     // Step 3: Retrieve chunks for academic queries or follow-ups
-    const rawChunks = await retrieveChunks(question, {
+    const vectorChunks = await retrieveChunks(question, {
         bookId: filters?.book_id,
         subject: filters?.subject,
         form: filters?.form,
         topK,
     });
 
-    log.info({ retrievedCount: rawChunks.length, intent }, 'Chunks retrieved');
+    // Step 3b: Expand with sibling chunks from the same section
+    const rawChunks = await expandWithSiblingChunks(vectorChunks, topK + 3);
+
+    log.info({ vectorCount: vectorChunks.length, expandedCount: rawChunks.length, intent }, 'Chunks retrieved and expanded');
 
     // For academic queries, if no chunks found, return refusal
     if (intent === 'academic_query' && rawChunks.length === 0) {
