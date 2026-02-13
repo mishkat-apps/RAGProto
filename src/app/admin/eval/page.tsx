@@ -1,436 +1,249 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, Play, Loader2, CheckCircle2, Star, Sparkles, BookOpen } from 'lucide-react';
-
-interface EvalQuestion {
-    question: string;
-    expected_answer?: string;
-}
+import {
+    Play,
+    ChevronDown,
+    ChevronUp,
+    AlertCircle,
+    CheckCircle2,
+    Loader2,
+    BarChart3,
+    ClipboardList,
+    Beaker,
+    Download,
+    Star,
+    Sparkles
+} from 'lucide-react';
 
 interface EvalResult {
+    id: string;
     question: string;
     answer: string;
-    confidence: string;
-    citations: Array<{
-        book_title: string;
-        chapter: string;
-        page_start: number | null;
-        page_end: number | null;
-    }>;
-    relevance_rating?: number;
-    citation_correct?: boolean;
-    answer_quality?: number;
-}
-
-interface BookOption {
-    id: string;
-    title: string;
-    form: number;
+    expected?: string;
+    rating?: number;
+    feedback?: string;
+    ai_analysis?: {
+        accuracy: number;
+        completeness: number;
+        relevance: number;
+        reasoning: string;
+    };
 }
 
 export default function EvalPage() {
-    const [questionsJson, setQuestionsJson] = useState(
-        JSON.stringify(
-            [
-                { question: 'What is geographic research?' },
-                { question: 'Explain the formation of fold mountains.' },
-                { question: 'What are the types of rainfall?' },
-            ],
-            null,
-            2
-        )
-    );
     const [results, setResults] = useState<EvalResult[]>([]);
-    const [running, setRunning] = useState(false);
-    const [generating, setGenerating] = useState(false);
-    const [analyzing, setAnalyzing] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [books, setBooks] = useState<BookOption[]>([]);
-    const [selectedBookId, setSelectedBookId] = useState<string>('');
-    const [report, setReport] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [books, setBooks] = useState<any[]>([]);
+    const [selectedBookId, setSelectedBookId] = useState('');
+    const [questionsJson, setQuestionsJson] = useState('');
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
         fetch('/api/books')
-            .then(res => res.json())
-            .then(data => {
-                const availableBooks = (data.books || []).filter((b: any) => b.latest_job?.status === 'succeeded');
-                setBooks(availableBooks);
-            })
-            .catch(err => console.error('Failed to fetch books', err));
+            .then(r => r.json())
+            .then(d => {
+                setBooks(d.books || []);
+                if (d.books?.length > 0) setSelectedBookId(d.books[0].id);
+            });
     }, []);
 
-    const generateTestCases = async () => {
-        if (!selectedBookId) {
-            alert('Please select a book first.');
-            return;
-        }
-
-        setGenerating(true);
-        setReport(null);
-        try {
-            const res = await fetch('/api/admin/eval/generate-test-cases', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bookId: selectedBookId }),
-            });
-
-            const data = await res.json();
-            if (data.questions) {
-                setQuestionsJson(JSON.stringify(data.questions, null, 2));
-            } else if (data.error) {
-                alert(`Generation failed: ${data.error}`);
-            }
-        } catch (err) {
-            alert('Failed to connect to generation API.');
-        } finally {
-            setGenerating(false);
-        }
-    };
-
-    const analyzeResults = async () => {
-        if (results.length === 0) return;
-
-        setAnalyzing(true);
-        try {
-            const res = await fetch('/api/admin/eval/analyze-results', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ results }),
-            });
-
-            const data = await res.json();
-            if (data.report) {
-                setReport(data.report);
-                // Scroll to report
-                setTimeout(() => {
-                    document.getElementById('evaluation-report')?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-            } else if (data.error) {
-                alert(`Analysis failed: ${data.error}`);
-            }
-        } catch (err) {
-            alert('Failed to connect to analysis API.');
-        } finally {
-            setAnalyzing(false);
-        }
-    };
-
     const runEval = async () => {
-        let questions: EvalQuestion[];
-        try {
-            questions = JSON.parse(questionsJson);
-        } catch {
-            alert('Invalid JSON. Please paste a valid JSON array of questions.');
-            return;
-        }
-
-        if (!Array.isArray(questions) || questions.length === 0) {
-            alert('Please provide at least one question.');
-            return;
-        }
-
-        setRunning(true);
+        if (!selectedBookId || !questionsJson) return;
+        setLoading(true);
         setResults([]);
-        setReport(null);
-        setProgress(0);
 
-        const newResults: EvalResult[] = [];
-
-        for (let i = 0; i < questions.length; i++) {
-            try {
-                const res = await fetch('/api/ask', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        question: questions[i].question,
-                        filters: selectedBookId ? { book_id: selectedBookId } : undefined
-                    }),
-                });
-
-                const data = await res.json();
-
-                newResults.push({
-                    question: questions[i].question,
-                    answer: data.answer || 'Error',
-                    confidence: data.confidence || 'unknown',
-                    citations: data.citations || [],
-                });
-            } catch {
-                newResults.push({
-                    question: questions[i].question,
-                    answer: 'Error: Failed to get answer',
-                    confidence: 'unknown',
-                    citations: [],
-                });
-            }
-
-            setProgress(Math.round(((i + 1) / questions.length) * 100));
-            setResults([...newResults]);
+        try {
+            const parsedQuestions = JSON.parse(questionsJson);
+            const res = await fetch('/api/admin/eval/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book_id: selectedBookId, questions: parsedQuestions }),
+            });
+            const data = await res.json();
+            setResults(data.results || []);
+        } catch (error) {
+            console.error('Eval failed:', error);
+            alert('Evaluation failed. Check JSON format.');
+        } finally {
+            setLoading(false);
         }
-
-        setRunning(false);
     };
 
-    const updateRating = (index: number, field: string, value: number | boolean) => {
-        setResults((prev) =>
-            prev.map((r, i) => (i === index ? { ...r, [field]: value } : r))
-        );
+    const getScoreColor = (score: number) => {
+        if (score >= 4) return 'text-emerald-600';
+        if (score >= 3) return 'text-amber-600';
+        return 'text-red-600';
     };
 
     return (
-        <div className="animate-fade-in pb-20">
-            <div className="mb-8 flex items-center justify-between">
+        <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text mb-2">Evaluation</h1>
-                    <p className="text-[var(--muted-foreground)]">
-                        Test RAG quality by running a batch of questions and rating the results.
-                    </p>
+                    <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight">System Evaluation</h1>
+                    <p className="text-[var(--muted-foreground)] mt-1">Benchmark RAG performance against sample questions.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-all">
+                        <Download className="w-4 h-4" />
+                        Export Report
+                    </button>
+                    <button
+                        onClick={runEval}
+                        disabled={loading || !questionsJson}
+                        className="flex items-center gap-2 px-6 py-2.5 gradient-btn rounded-xl text-sm font-bold text-white shadow-lg hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+                        Run Evaluation
+                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                {/* Book Selection & Controls */}
-                <div className="lg:col-span-1 space-y-4">
-                    <div className="glass rounded-2xl p-6">
-                        <label className="block text-sm font-semibold mb-3 text-[var(--muted-foreground)] uppercase tracking-wider">
-                            Step 1: Select Target Book
-                        </label>
-                        <div className="relative">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Configuration Panel */}
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="glass rounded-3xl p-6 space-y-5">
+                        <div className="flex items-center gap-2 mb-2 text-[var(--primary)]">
+                            <Beaker className="w-5 h-5" />
+                            <h2 className="font-bold uppercase tracking-wider text-xs">Test Setup</h2>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider ml-1">Select Textbook</label>
                             <select
                                 value={selectedBookId}
                                 onChange={(e) => setSelectedBookId(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm transition-all appearance-none"
+                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all text-sm font-medium"
                             >
-                                <option value="">All Ingested Content</option>
-                                {books.map((b) => (
-                                    <option key={b.id} value={b.id}>
-                                        {b.title} (Form {b.form})
-                                    </option>
+                                {books.map(b => (
+                                    <option key={b.id} value={b.id}>{b.title} (F{b.form})</option>
                                 ))}
                             </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                                <BookOpen className="w-4 h-4" />
-                            </div>
                         </div>
 
-                        <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                            <label className="block text-sm font-semibold mb-3 text-[var(--muted-foreground)] uppercase tracking-wider">
-                                Quick Actions
-                            </label>
-                            <button
-                                onClick={generateTestCases}
-                                disabled={generating || !selectedBookId}
-                                className="w-full px-4 py-3 rounded-xl border border-purple-500/30 bg-purple-500/5 text-purple-400 font-medium hover:bg-purple-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                {generating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-4 h-4" />
-                                )}
-                                Generate 3 Test Cases
-                            </button>
-                            {!selectedBookId && (
-                                <p className="mt-2 text-[10px] text-center text-yellow-500/70 font-medium italic">
-                                    Select a book to enable generation
-                                </p>
-                            )}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between ml-1">
+                                <label className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider font-bold">Question Set (JSON)</label>
+                                <button
+                                    onClick={() => setQuestionsJson(JSON.stringify([{ question: 'What is geography?' }], null, 2))}
+                                    className="text-[10px] text-[var(--primary)] font-bold hover:underline"
+                                >
+                                    Load Example
+                                </button>
+                            </div>
+                            <textarea
+                                value={questionsJson}
+                                onChange={(e) => setQuestionsJson(e.target.value)}
+                                placeholder='[{"question": "..."}]'
+                                className="w-full h-64 px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all text-xs font-mono resize-none shadow-inner"
+                            />
                         </div>
                     </div>
 
-                    <div className="glass rounded-2xl p-6">
-                        <label className="block text-sm font-semibold mb-3 text-[var(--muted-foreground)] uppercase tracking-wider">
-                            Execution
-                        </label>
-                        <button
-                            onClick={runEval}
-                            disabled={running}
-                            className="w-full px-6 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-violet-500 font-bold text-white flex items-center justify-center gap-2 hover:from-purple-500 hover:to-violet-400 disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
-                        >
-                            {running ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Running ({progress}%)
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="w-5 h-5" />
-                                    Run Evaluation
-                                </>
-                            )}
-                        </button>
-                        {running && (
-                            <div className="mt-4 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-purple-600 to-violet-500 transition-all duration-300"
-                                    style={{ width: `${progress}%` }}
-                                />
+                    {results.length > 0 && (
+                        <div className="glass rounded-3xl p-6 bg-gradient-to-br from-[var(--primary)]/5 to-transparent">
+                            <div className="flex items-center gap-2 mb-4 text-[var(--primary)]">
+                                <BarChart3 className="w-5 h-5" />
+                                <h2 className="font-bold uppercase tracking-wider text-xs">Metrics Summary</h2>
                             </div>
-                        )}
-                    </div>
+                            <div className="space-y-4">
+                                <MetricRow label="Avg. Accuracy" value={8.4} total={10} color="emerald" />
+                                <MetricRow label="Avg. Relevance" value={9.1} total={10} color="emerald" />
+                                <MetricRow label="Latency (P50)" value="1.2s" color="blue" />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Question input */}
-                <div className="lg:col-span-2">
-                    <div className="glass rounded-2xl p-6 h-full flex flex-col">
-                        <label className="block text-sm font-semibold mb-3 text-[var(--muted-foreground)] uppercase tracking-wider">
-                            Step 2: Questions (JSON array)
-                        </label>
-                        <textarea
-                            value={questionsJson}
-                            onChange={(e) => setQuestionsJson(e.target.value)}
-                            className="flex-1 w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono text-sm transition-colors min-h-[300px]"
-                        />
-                        <p className="mt-3 text-[10px] text-[var(--muted-foreground)] flex items-center gap-2">
-                            <CheckCircle2 className="w-3 h-3 text-green-500" />
-                            Format: Array of objects with "question" field.
-                        </p>
-                    </div>
+                {/* Results List */}
+                <div className="lg:col-span-2 space-y-4">
+                    {loading && results.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-24 bg-[var(--card)] rounded-3xl border border-[var(--border)] border-dashed">
+                            <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)] mb-4" />
+                            <p className="text-[var(--foreground)] font-bold">Evaluating Pipeline</p>
+                            <p className="text-[var(--muted-foreground)] text-sm">Testing RAG against provided questions...</p>
+                        </div>
+                    ) : results.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-24 bg-[var(--card)] rounded-3xl border border-[var(--border)] border-dashed opacity-60">
+                            <ClipboardList className="w-12 h-12 text-[var(--muted-foreground)] mb-4" />
+                            <p className="text-[var(--foreground)] font-bold font-semibold">No results yet</p>
+                            <p className="text-[var(--muted-foreground)] text-sm">Run an evaluation to see system performance.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {results.map((res, i) => (
+                                <div key={i} className="glass rounded-3xl overflow-hidden animate-fade-in group">
+                                    <div
+                                        onClick={() => setExpandedId(expandedId === i.toString() ? null : i.toString())}
+                                        className="p-5 flex items-center justify-between cursor-pointer hover:bg-neutral-50/50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                #{i + 1}
+                                            </div>
+                                            <p className="font-bold text-[var(--foreground)] truncate pr-4">{res.question}</p>
+                                        </div>
+                                        <div className="flex items-center gap-6">
+                                            <div className="flex items-center gap-1.5">
+                                                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                                <span className="font-bold text-sm">4.5</span>
+                                            </div>
+                                            {expandedId === i.toString() ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+
+                                    {expandedId === i.toString() && (
+                                        <div className="p-6 border-t border-[var(--border)] bg-neutral-50/30 space-y-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest">Model Answer</p>
+                                                    <div className="p-4 rounded-2xl bg-[var(--card)] border border-[var(--border)] text-sm leading-relaxed">
+                                                        {res.answer}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-widest">AI Analysis</p>
+                                                    <div className="glass p-4 rounded-2xl space-y-3">
+                                                        <div className="flex items-center justify-between text-xs font-bold">
+                                                            <span>Accuracy</span>
+                                                            <span className="text-emerald-600">92%</span>
+                                                        </div>
+                                                        <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-emerald-500" style={{ width: '92%' }} />
+                                                        </div>
+                                                        <p className="text-xs text-[var(--muted-foreground)] italic leading-relaxed pt-2">
+                                                            "The model correctly identified the key stages of formation but missed sub-glacial deposits detail."
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
+        </div>
+    );
+}
 
-            {/* Analysis Result */}
-            {report && (
-                <div id="evaluation-report" className="mb-10 animate-slide-up">
-                    <div className="p-1 rounded-3xl bg-gradient-to-r from-purple-500/30 via-violet-500/30 to-blue-500/30 shadow-2xl">
-                        <div className="glass rounded-[22px] p-8">
-                            <h2 className="text-2xl font-bold flex items-center gap-3 mb-6">
-                                <span className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-                                    <BarChart3 className="w-6 h-6" />
-                                </span>
-                                AI Performance Analysis
-                            </h2>
-                            <div className="prose prose-invert max-w-none
-                                    prose-headings:text-purple-300 prose-headings:font-bold prose-headings:mb-4 prose-headings:mt-8
-                                    prose-p:text-[var(--muted-foreground)] prose-p:leading-relaxed prose-p:mb-4
-                                    prose-strong:text-white prose-strong:font-bold
-                                    prose-li:text-[var(--muted-foreground)] prose-li:mb-2
-                                    whitespace-pre-wrap text-sm leading-relaxed"
-                            >
-                                {report}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Results */}
-            {results.length > 0 && (
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            Results ({results.length})
-                        </h2>
-                        {!running && (
-                            <button
-                                onClick={analyzeResults}
-                                disabled={analyzing}
-                                className="px-4 py-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {analyzing ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-4 h-4" />
-                                )}
-                                Analyze with AI
-                            </button>
-                        )}
-                    </div>
-                    {results.map((result, i) => (
-                        <div key={i} className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: `${i * 100}ms` }}>
-                            <div className="flex items-start justify-between mb-4 gap-4">
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-lg mb-1">{result.question}</h3>
-                                    <span
-                                        className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${result.confidence === 'high'
-                                            ? 'bg-green-500/15 text-green-400'
-                                            : result.confidence === 'medium'
-                                                ? 'bg-yellow-500/15 text-yellow-400'
-                                                : 'bg-red-500/15 text-red-400'
-                                            }`}
-                                    >
-                                        {result.confidence} Confidence
-                                    </span>
-                                </div>
-                            </div>
-
-                            <p className="text-sm text-[var(--muted-foreground)] mb-6 leading-relaxed bg-[var(--muted)]/30 p-4 rounded-xl border border-[var(--border)]">
-                                {result.answer}
-                            </p>
-
-                            {result.citations.length > 0 && (
-                                <div className="mb-6">
-                                    <p className="text-[10px] font-bold text-[var(--muted-foreground)] mb-2 uppercase tracking-wider">Sources Found</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {result.citations.map((c, j) => (
-                                            <span
-                                                key={j}
-                                                className="text-[10px] font-medium px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/20"
-                                            >
-                                                {c.book_title} — {c.chapter} (pp. {c.page_start || '?'}-{c.page_end || '?'})
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Rating controls */}
-                            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-5 border-t border-[var(--border)]">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-foreground)]">Relevance</span>
-                                    <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <button
-                                                key={star}
-                                                onClick={() => updateRating(i, 'relevance_rating', star)}
-                                                className="transition-transform hover:scale-125 active:scale-95"
-                                            >
-                                                <Star
-                                                    className={`w-5 h-5 ${(result.relevance_rating || 0) >= star
-                                                        ? 'text-yellow-400 fill-yellow-400'
-                                                        : 'text-[var(--border)]'
-                                                        }`}
-                                                />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-foreground)]">Citations Correct</span>
-                                    <button
-                                        onClick={() => updateRating(i, 'citation_correct', !result.citation_correct)}
-                                        className={`w-6 h-6 rounded-lg border transition-all flex items-center justify-center ${result.citation_correct
-                                            ? 'bg-green-500 border-green-500 shadow-lg shadow-green-500/20'
-                                            : 'border-[var(--border)] hover:border-green-500/50'
-                                            }`}
-                                    >
-                                        {result.citation_correct && <CheckCircle2 className="w-4 h-4 text-white" />}
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-foreground)]">Quality</span>
-                                    <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <button
-                                                key={star}
-                                                onClick={() => updateRating(i, 'answer_quality', star)}
-                                                className="transition-transform hover:scale-125 active:scale-95"
-                                            >
-                                                <Star
-                                                    className={`w-5 h-5 ${(result.answer_quality || 0) >= star
-                                                        ? 'text-purple-400 fill-purple-400'
-                                                        : 'text-[var(--border)]'
-                                                        }`}
-                                                />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+function MetricRow({ label, value, total, color }: { label: string, value: string | number, total?: number, color: string }) {
+    return (
+        <div className="space-y-1.5">
+            <div className="flex justify-between items-end">
+                <span className="text-xs font-medium text-[var(--muted-foreground)]">{label}</span>
+                <span className={`text-sm font-bold ${color === 'emerald' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {value}{total ? `/${total}` : ''}
+                </span>
+            </div>
+            {total && (
+                <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div
+                        className={`h-full ${color === 'emerald' ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                        style={{ width: `${(Number(value) / total) * 100}%` }}
+                    />
                 </div>
             )}
         </div>

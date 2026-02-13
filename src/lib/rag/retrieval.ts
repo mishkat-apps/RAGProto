@@ -195,9 +195,11 @@ export async function enrichChunksWithContext(chunks: MatchedChunk[]): Promise<
     const bookMap = new Map((books || []).map((b) => [b.id, b.title]));
 
     // Get section info for chunks that have section_id
-    const sectionIds = chunks
-        .map((c) => c.section_id)
-        .filter((id): id is string => id !== null);
+    const sectionIds = [...new Set(
+        chunks
+            .map((c) => c.section_id)
+            .filter((id): id is string => id !== null)
+    )];
 
     const { data: sections } = await supabase
         .from('sections')
@@ -205,6 +207,42 @@ export async function enrichChunksWithContext(chunks: MatchedChunk[]): Promise<
         .in('id', sectionIds);
 
     const sectionMap = new Map((sections || []).map((s) => [s.id, s]));
+
+    // Fetch parent sections (chapters) that aren't already in sectionMap
+    // This resolves the "Unknown" chapter issue — chunks point to topics,
+    // but the chapter is the topic's parent which wasn't fetched above.
+    const missingParentIds = [...new Set(
+        (sections || [])
+            .map((s) => s.parent_id)
+            .filter((id): id is string => id !== null && !sectionMap.has(id))
+    )];
+
+    if (missingParentIds.length > 0) {
+        const { data: parents } = await supabase
+            .from('sections')
+            .select('id, title, level, parent_id')
+            .in('id', missingParentIds);
+
+        for (const p of parents || []) {
+            sectionMap.set(p.id, p);
+        }
+
+        // One more level: if parents also have parents (grandparent chapters)
+        const missingGrandparents = (parents || [])
+            .map((p) => p.parent_id)
+            .filter((id): id is string => id !== null && !sectionMap.has(id));
+
+        if (missingGrandparents.length > 0) {
+            const { data: grandparents } = await supabase
+                .from('sections')
+                .select('id, title, level, parent_id')
+                .in('id', [...new Set(missingGrandparents)]);
+
+            for (const gp of grandparents || []) {
+                sectionMap.set(gp.id, gp);
+            }
+        }
+    }
 
     return chunks.map((chunk) => {
         const bookTitle = bookMap.get(chunk.book_id) || 'Unknown Book';

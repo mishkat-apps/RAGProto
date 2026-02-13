@@ -1,315 +1,271 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BookOpen, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Play, RotateCcw } from 'lucide-react';
+import {
+    Library,
+    RefreshCcw,
+    Play,
+    AlertCircle,
+    CheckCircle2,
+    Clock,
+    MoreVertical,
+    Trash2,
+    Search,
+    Filter,
+    ChevronRight,
+    SearchX
+} from 'lucide-react';
 
-interface BookWithJob {
+interface Book {
     id: string;
     title: string;
     subject: string;
     form: number;
     language: string;
-    publisher: string | null;
+    publisher?: string;
     created_at: string;
-    latest_job: {
+    latest_job?: {
         id: string;
-        status: string;
+        status: 'queued' | 'running' | 'succeeded' | 'failed';
         progress: number;
-        error: string | null;
-        updated_at: string;
-    } | null;
+        error?: string;
+    };
 }
 
 export default function BooksPage() {
-    const [books, setBooks] = useState<BookWithJob[]>([]);
+    const [books, setBooks] = useState<Book[]>([]);
     const [loading, setLoading] = useState(true);
-    const [workerRunning, setWorkerRunning] = useState(false);
-    const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [runningJobId, setRunningJobId] = useState<string | null>(null);
 
     const fetchBooks = async () => {
-        setLoading(true);
         try {
             const res = await fetch('/api/books');
             const data = await res.json();
             setBooks(data.books || []);
-        } catch {
-            console.error('Failed to fetch books');
+        } catch (error) {
+            console.error('Failed to fetch books:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchBooks();
+        const interval = setInterval(fetchBooks, 5000); // Poll every 5s for progress
+        return () => clearInterval(interval);
     }, []);
 
     const runWorker = async () => {
-        setWorkerRunning(true);
+        setRefreshing(true);
         try {
-            const secret = prompt('Enter WORKER_SECRET:');
-            if (!secret) return;
-
-            const res = await fetch('/api/worker/ingest', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${secret}` },
-            });
-
-            const data = await res.json();
-            alert(data.message || JSON.stringify(data));
+            await fetch('/api/worker/run', { method: 'POST' });
             fetchBooks();
-        } catch (err) {
-            alert(`Worker failed: ${err instanceof Error ? err.message : String(err)}`);
+        } catch (error) {
+            console.error('Failed to run worker:', error);
         }
-        setWorkerRunning(false);
     };
 
-    const retryJob = async (jobId: string) => {
-        setRetryingJobId(jobId);
-        try {
-            const res = await fetch('/api/jobs/retry', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ job_id: jobId }),
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                alert(`Retry failed: ${data.error}`);
-                setRetryingJobId(null);
-                return;
-            }
-
-            // Automatically run the worker after re-queuing
-            const secret = prompt('Enter WORKER_SECRET to run the worker:');
-            if (secret) {
-                await fetch('/api/worker/ingest', {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${secret}` },
-                });
-            }
-
-            fetchBooks();
-        } catch (err) {
-            alert(`Retry failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-        setRetryingJobId(null);
-    };
-
-    const statusIcon = (status: string) => {
+    const getStatusIcon = (status?: string) => {
         switch (status) {
-            case 'succeeded':
-                return <CheckCircle2 className="w-4 h-4 text-green-400" />;
-            case 'failed':
-                return <XCircle className="w-4 h-4 text-red-400" />;
-            case 'running':
-                return <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />;
-            default:
-                return <Clock className="w-4 h-4 text-[var(--muted-foreground)]" />;
+            case 'succeeded': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+            case 'failed': return <AlertCircle className="w-4 h-4 text-red-500" />;
+            case 'running': return <RefreshCcw className="w-4 h-4 text-blue-500 animate-spin" />;
+            default: return <Clock className="w-4 h-4 text-amber-500" />;
         }
     };
 
-    const statusBadge = (status: string) => {
-        const colors: Record<string, string> = {
-            succeeded: 'bg-green-500/15 text-green-400 border-green-500/30',
-            failed: 'bg-red-500/15 text-red-400 border-red-500/30',
-            running: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-            queued: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-        };
-
-        return (
-            <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${colors[status] || 'bg-gray-500/15 text-gray-400 border-gray-500/30'
-                    }`}
-            >
-                {statusIcon(status)}
-                {status}
-            </span>
-        );
+    const getStatusStyles = (status?: string) => {
+        switch (status) {
+            case 'succeeded': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+            case 'failed': return 'bg-red-50 text-red-700 border-red-100';
+            case 'running': return 'bg-blue-50 text-blue-700 border-blue-100';
+            default: return 'bg-amber-50 text-amber-700 border-amber-100';
+        }
     };
 
     return (
-        <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-8">
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text mb-2">Books</h1>
-                    <p className="text-[var(--muted-foreground)]">
-                        Manage ingested textbooks and their processing status.
-                    </p>
+                    <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight">Textbook Library</h1>
+                    <p className="text-[var(--muted-foreground)] mt-1">Manage and monitor ingested textbooks for RAG.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={fetchBooks}
-                        className="px-4 py-2 rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--muted)] transition-colors flex items-center gap-2"
+                        onClick={() => { setRefreshing(true); fetchBooks(); }}
+                        disabled={refreshing}
+                        className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-all"
+                        title="Refresh list"
                     >
-                        <RefreshCw className="w-4 h-4" />
-                        Refresh
+                        <RefreshCcw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
                     </button>
                     <button
                         onClick={runWorker}
-                        disabled={workerRunning}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-violet-500 text-sm font-semibold hover:from-purple-500 hover:to-violet-400 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                        className="flex items-center gap-2 px-5 py-2.5 gradient-btn rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-90 transition-all active:scale-95"
                     >
-                        {workerRunning ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Play className="w-4 h-4" />
-                        )}
-                        Run Worker
+                        <Play className="w-4 h-4 fill-current" />
+                        Run All Jobs
                     </button>
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="glass p-5 rounded-2xl">
+                    <p className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Total Books</p>
+                    <p className="text-2xl font-bold mt-1">{books.length}</p>
+                </div>
+                <div className="glass p-5 rounded-2xl">
+                    <p className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Succeeded</p>
+                    <p className="text-2xl font-bold mt-1 text-emerald-600">{books.filter(b => b.latest_job?.status === 'succeeded').length}</p>
+                </div>
+                <div className="glass p-5 rounded-2xl">
+                    <p className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Failed / Queued</p>
+                    <p className="text-2xl font-bold mt-1 text-amber-600">{books.filter(b => b.latest_job?.status !== 'succeeded').length}</p>
+                </div>
+            </div>
+
+            {loading && books.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-[var(--card)] rounded-3xl border border-[var(--border)]">
+                    <LoaderPulse />
                 </div>
             ) : books.length === 0 ? (
-                <div className="glass rounded-2xl p-12 text-center">
-                    <BookOpen className="w-16 h-16 text-[var(--muted-foreground)] mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold mb-2">No books yet</h2>
-                    <p className="text-[var(--muted-foreground)]">
-                        Upload a textbook to get started.
-                    </p>
+                <div className="flex flex-col items-center justify-center py-20 bg-[var(--card)] rounded-3xl border border-[var(--border)] border-dashed">
+                    <div className="w-16 h-16 rounded-2xl bg-[var(--muted)] flex items-center justify-center mb-4">
+                        <SearchX className="w-8 h-8 text-[var(--muted-foreground)]" />
+                    </div>
+                    <p className="text-[var(--foreground)] font-semibold">No books found</p>
+                    <p className="text-[var(--muted-foreground)] text-sm">Upload your first textbook to get started.</p>
                 </div>
             ) : (
-                <div className="glass rounded-2xl overflow-hidden">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-[var(--border)]">
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Title
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Subject
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Form
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Status
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Progress
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Created
-                                </th>
-                                <th className="text-left px-6 py-4 text-sm font-medium text-[var(--muted-foreground)]">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {books.map((book) => (
-                                <tr
-                                    key={book.id}
-                                    className="border-b border-[var(--border)] last:border-0 hover:bg-purple-500/5 transition-colors"
-                                >
-                                    <td className="px-6 py-4 font-medium">{book.title}</td>
-                                    <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
-                                        {book.subject}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
-                                        Form {book.form}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {book.latest_job ? statusBadge(book.latest_job.status) : (
-                                            <span className="text-sm text-[var(--muted-foreground)]">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {book.latest_job ? (
+                <div className="glass rounded-3xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-[var(--muted)]/50">
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Book Details</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Subject & Form</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Progress</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Added On</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)]">
+                                {books.map((book) => (
+                                    <tr key={book.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                        <td className="px-6 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className="flex-1 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden max-w-[100px]">
+                                                <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0 text-[var(--primary)]">
+                                                    <Library className="w-5 h-5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-[var(--foreground)] truncate max-w-[200px]">{book.title}</p>
+                                                    <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-tight">{book.publisher || 'Unknown Publisher'}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-[var(--foreground)]">{book.subject}</span>
+                                                <span className="text-xs text-[var(--muted-foreground)]">Form {book.form}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyles(book.latest_job?.status)}`}>
+                                                {getStatusIcon(book.latest_job?.status)}
+                                                <span className="capitalize">{book.latest_job?.status || 'Unknown'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <div className="w-32">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-[10px] font-bold text-[var(--muted-foreground)]">{book.latest_job?.progress || 0}%</span>
+                                                </div>
+                                                <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                                                     <div
-                                                        className="h-full bg-purple-500 rounded-full transition-all"
-                                                        style={{ width: `${book.latest_job.progress}%` }}
+                                                        className="h-full bg-[var(--primary)] transition-all duration-1000"
+                                                        style={{ width: `${book.latest_job?.progress || 0}%` }}
                                                     />
                                                 </div>
-                                                <span className="text-xs text-[var(--muted-foreground)]">
-                                                    {book.latest_job.progress}%
-                                                </span>
                                             </div>
-                                        ) : (
-                                            <span className="text-sm text-[var(--muted-foreground)]">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
-                                        {new Date(book.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {book.latest_job?.status === 'failed' && (
-                                            <button
-                                                onClick={() => retryJob(book.latest_job!.id)}
-                                                disabled={retryingJobId === book.latest_job!.id}
-                                                className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-medium hover:bg-red-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                                            >
-                                                {retryingJobId === book.latest_job!.id ? (
-                                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                                ) : (
-                                                    <RotateCcw className="w-3 h-3" />
-                                                )}
-                                                Retry
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <span className="text-sm text-[var(--muted-foreground)]">
+                                                {new Date(book.created_at).toLocaleDateString()}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <div className="flex items-center gap-2">
+                                                <button className="p-2 rounded-lg hover:bg-neutral-100 text-[var(--muted-foreground)] hover:text-red-600 transition-colors">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                                <button className="p-2 rounded-lg hover:bg-neutral-100 text-[var(--muted-foreground)] transition-colors">
+                                                    <MoreVertical className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
-            {/* Show pending jobs without books */}
-            <PendingJobs />
+            {/* Show jobs without associated books if any */}
+            <PendingJobsSection />
         </div>
     );
 }
 
-function PendingJobs() {
-    const [jobs, setJobs] = useState<Array<{
-        id: string;
-        status: string;
-        progress: number;
-        error: string | null;
-        metadata: Record<string, unknown>;
-        created_at: string;
-    }>>([]);
+function LoaderPulse() {
+    return (
+        <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-2 h-2 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-2 h-2 rounded-full bg-[var(--primary)] animate-bounce" />
+        </div>
+    );
+}
+
+function PendingJobsSection() {
+    const [jobs, setJobs] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch('/api/jobs')
-            .then((r) => r.json())
-            .then((d) => {
-                const pending = (d.jobs || []).filter(
-                    (j: { status: string }) => j.status === 'queued' || j.status === 'running'
-                );
-                setJobs(pending);
-            })
-            .catch(() => { });
+        const fetchJobs = async () => {
+            try {
+                const res = await fetch('/api/jobs');
+                const data = await res.json();
+                // Filter jobs that don't have a book title in the UI for now, 
+                // though usually jobs relate to books.
+                setJobs((data.jobs || []).filter((j: any) => !j.book_id));
+            } catch { }
+        };
+        fetchJobs();
     }, []);
 
     if (jobs.length === 0) return null;
 
     return (
-        <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Pending Jobs</h2>
-            <div className="space-y-3">
+        <div className="mt-12 space-y-4">
+            <h2 className="text-xl font-bold text-[var(--foreground)] px-1">Other Background Tasks</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {jobs.map((job) => (
-                    <div key={job.id} className="glass rounded-xl p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium">
-                                {(job.metadata as { title?: string })?.title || 'Unnamed'}
-                            </p>
-                            <p className="text-xs text-[var(--muted-foreground)]">Job ID: {job.id}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="w-24 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-yellow-500 rounded-full animate-pulse"
-                                    style={{ width: `${job.progress}%` }}
-                                />
+                    <div key={job.id} className="glass p-5 rounded-2xl flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center">
+                                <Clock className="w-5 h-5 text-[var(--muted-foreground)]" />
                             </div>
-                            <span className="text-xs text-yellow-400">{job.status}</span>
+                            <div>
+                                <p className="text-sm font-bold text-[var(--foreground)]">System Job #{job.id.slice(0, 8)}</p>
+                                <p className="text-xs text-[var(--muted-foreground)] capitalize">{job.status} • {job.progress}%</p>
+                            </div>
+                        </div>
+                        <div className="w-20 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-[var(--accent-blue)]" style={{ width: `${job.progress}%` }} />
                         </div>
                     </div>
                 ))}

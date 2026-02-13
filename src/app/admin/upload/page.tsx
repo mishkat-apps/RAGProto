@@ -1,272 +1,218 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { createSupabaseBrowser } from '@/lib/supabase/client';
-
-type UploadStatus = 'idle' | 'uploading' | 'ingesting' | 'success' | 'error';
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2, BookOpen } from 'lucide-react';
 
 export default function UploadPage() {
-    const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
-    const [subject, setSubject] = useState('Geography');
-    const [form, setForm] = useState(4);
+    const [subject, setSubject] = useState('');
+    const [form, setForm] = useState('1');
     const [language, setLanguage] = useState('en');
     const [publisher, setPublisher] = useState('');
-    const [status, setStatus] = useState<UploadStatus>('idle');
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [jobId, setJobId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    const onDrop = useCallback((accepted: File[]) => {
-        if (accepted.length > 0) {
-            setFile(accepted[0]);
-            if (!title) {
-                setTitle(accepted[0].name.replace('.pdf', ''));
-            }
-        }
-    }, [title]);
+    const [file, setFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
         accept: { 'application/pdf': ['.pdf'] },
         maxFiles: 1,
-        maxSize: 100 * 1024 * 1024, // 100MB
+        onDrop: (acceptedFiles) => setFile(acceptedFiles[0])
     });
 
-    const handleSubmit = async () => {
+    const handleUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
         if (!file || !title || !subject) return;
 
-        setStatus('uploading');
-        setError(null);
+        setUploading(true);
+        setProgress(0);
+        setStatus(null);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', title);
+        formData.append('subject', subject);
+        formData.append('form', form);
+        formData.append('language', language);
+        if (publisher) formData.append('publisher', publisher);
 
         try {
-            // Upload to Supabase Storage
-            const supabase = createSupabaseBrowser();
-            const storagePath = `books/${Date.now()}-${file.name}`;
+            // Simulated progress for better UX before actual API call
+            const progressInterval = setInterval(() => {
+                setProgress(prev => (prev < 90 ? prev + 5 : prev));
+            }, 500);
 
-            setUploadProgress(10);
-
-            const { error: uploadError } = await supabase.storage
-                .from('textbooks')
-                .upload(storagePath, file, {
-                    cacheControl: '3600',
-                    upsert: false,
-                });
-
-            if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-
-            setUploadProgress(50);
-            setStatus('ingesting');
-
-            // Create ingest job
-            const res = await fetch('/api/ingest', {
+            const res = await fetch('/api/admin/books/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    storage_path: storagePath,
-                    title,
-                    subject,
-                    form,
-                    language,
-                    publisher: publisher || undefined,
-                }),
+                body: formData,
             });
+
+            clearInterval(progressInterval);
+            setProgress(100);
 
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error || 'Failed to create ingest job');
+            if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-            setJobId(data.job_id);
-            setUploadProgress(100);
-            setStatus('success');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            setStatus('error');
+            setStatus({ type: 'success', message: 'Textbook uploaded and queued for ingestion!' });
+            setTitle('');
+            setSubject('');
+            setPublisher('');
+            setFile(null);
+        } catch (error: any) {
+            setStatus({ type: 'error', message: error.message });
+        } finally {
+            setUploading(false);
         }
     };
 
-    const subjects = ['Geography', 'History', 'Biology', 'Chemistry', 'Physics', 'Mathematics', 'English', 'Kiswahili', 'Civics'];
-
     return (
-        <div className="animate-fade-in">
+        <div className="max-w-4xl mx-auto animate-fade-in">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold gradient-text mb-2">Upload Textbook</h1>
-                <p className="text-[var(--muted-foreground)]">
-                    Upload a PDF textbook to process and add to the knowledge base.
-                </p>
+                <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight">Add New Textbook</h1>
+                <p className="text-[var(--muted-foreground)] mt-1">Upload a PDF textbook and our AI will parse it into the knowledge base.</p>
             </div>
 
-            <div className="glass rounded-2xl p-8 max-w-2xl">
-                {/* Dropzone */}
-                <div
-                    {...getRootProps()}
-                    className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 ${isDragActive
-                            ? 'border-purple-500 bg-purple-500/10'
-                            : file
-                                ? 'border-green-500/50 bg-green-500/5'
-                                : 'border-[var(--border)] hover:border-purple-500/50 hover:bg-purple-500/5'
-                        }`}
-                >
-                    <input {...getInputProps()} />
-                    {file ? (
-                        <div className="flex flex-col items-center gap-3">
-                            <FileText className="w-12 h-12 text-green-400" />
-                            <p className="font-medium">{file.name}</p>
-                            <p className="text-sm text-[var(--muted-foreground)]">
-                                {(file.size / 1024 / 1024).toFixed(1)} MB
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-3">
-                            <Upload className="w-12 h-12 text-[var(--muted-foreground)]" />
-                            <p className="font-medium">
-                                {isDragActive ? 'Drop the PDF here' : 'Drop a PDF textbook or click to browse'}
-                            </p>
-                            <p className="text-sm text-[var(--muted-foreground)]">Max 100 MB</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Metadata form */}
-                <div className="mt-8 space-y-5">
-                    <div>
-                        <label className="block text-sm font-medium mb-2 text-[var(--muted-foreground)]">
-                            Book Title *
-                        </label>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g., Geography Form 4"
-                            className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2 text-[var(--muted-foreground)]">
-                                Subject *
-                            </label>
-                            <select
-                                value={subject}
-                                onChange={(e) => setSubject(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors"
-                            >
-                                {subjects.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-2 text-[var(--muted-foreground)]">
-                                Form *
-                            </label>
-                            <select
-                                value={form}
-                                onChange={(e) => setForm(Number(e.target.value))}
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors"
-                            >
-                                {[1, 2, 3, 4, 5, 6].map((f) => (
-                                    <option key={f} value={f}>Form {f}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2 text-[var(--muted-foreground)]">
-                                Language
-                            </label>
-                            <select
-                                value={language}
-                                onChange={(e) => setLanguage(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors"
-                            >
-                                <option value="en">English</option>
-                                <option value="sw">Kiswahili</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-2 text-[var(--muted-foreground)]">
-                                Publisher
-                            </label>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Form Section */}
+                <div className="lg:col-span-7 space-y-6">
+                    <form onSubmit={handleUpload} className="glass rounded-3xl p-8 space-y-5 shadow-sm">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Book Title</label>
                             <input
+                                required
                                 type="text"
-                                value={publisher}
-                                onChange={(e) => setPublisher(e.target.value)}
-                                placeholder="Optional"
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--muted)] border border-[var(--border)] focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Geography for Secondary Schools"
+                                className="w-full px-5 py-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition-all shadow-inner"
                             />
                         </div>
-                    </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Subject</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={subject}
+                                    onChange={(e) => setSubject(e.target.value)}
+                                    placeholder="e.g. Geography"
+                                    className="w-full px-5 py-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition-all shadow-inner"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Form Level</label>
+                                <select
+                                    value={form}
+                                    onChange={(e) => setForm(e.target.value)}
+                                    className="w-full px-5 py-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all cursor-pointer"
+                                >
+                                    {[1, 2, 3, 4, 5, 6].map(n => (
+                                        <option key={n} value={n}>Form {n}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Language</label>
+                                <select
+                                    value={language}
+                                    onChange={(e) => setLanguage(e.target.value)}
+                                    className="w-full px-5 py-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none transition-all cursor-pointer"
+                                >
+                                    <option value="en">English</option>
+                                    <option value="sw">Swahili</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider ml-1">Publisher</label>
+                                <input
+                                    type="text"
+                                    value={publisher}
+                                    onChange={(e) => setPublisher(e.target.value)}
+                                    placeholder="e.g. TIE, Oxford"
+                                    className="w-full px-5 py-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition-all shadow-inner"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-4">
+                            <button
+                                type="submit"
+                                disabled={!file || !title || !subject || uploading}
+                                className="w-full py-4 rounded-2xl gradient-btn text-white font-bold text-lg shadow-lg hover:opacity-90 disabled:opacity-50 disabled:translate-y-0 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                            >
+                                {uploading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Uploading {progress}%
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload className="w-5 h-5" />
+                                        Upload Textbook
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {status && (
+                            <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 ${status.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'
+                                }`}>
+                                {status.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                                <p className="text-sm font-medium">{status.message}</p>
+                            </div>
+                        )}
+                    </form>
                 </div>
 
-                {/* Upload progress */}
-                {status !== 'idle' && (
-                    <div className="mt-6">
-                        <div className="h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-purple-600 to-violet-500 transition-all duration-500 rounded-full"
-                                style={{ width: `${uploadProgress}%` }}
-                            />
-                        </div>
-                        <div className="mt-3 flex items-center gap-2">
-                            {status === 'uploading' && (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                                    <span className="text-sm text-[var(--muted-foreground)]">Uploading to storage...</span>
-                                </>
-                            )}
-                            {status === 'ingesting' && (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                                    <span className="text-sm text-[var(--muted-foreground)]">Creating ingest job...</span>
-                                </>
-                            )}
-                            {status === 'success' && (
-                                <>
-                                    <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                    <span className="text-sm text-green-400">
-                                        Job created! ID: {jobId}
-                                    </span>
-                                </>
-                            )}
-                            {status === 'error' && (
-                                <>
-                                    <AlertCircle className="w-4 h-4 text-red-400" />
-                                    <span className="text-sm text-red-400">{error}</span>
-                                </>
-                            )}
-                        </div>
+                {/* Dropzone Section */}
+                <div className="lg:col-span-5">
+                    <div
+                        {...getRootProps()}
+                        className={`h-full min-h-[300px] border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isDragActive
+                                ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-[1.02]'
+                                : file
+                                    ? 'border-emerald-400 bg-emerald-50/30'
+                                    : 'border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--muted)]'
+                            }`}
+                    >
+                        <input {...getInputProps()} />
+
+                        {file ? (
+                            <div className="animate-fade-in flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
+                                    <FileText className="w-10 h-10" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="font-bold text-[var(--foreground)] truncate max-w-[200px]">{file.name}</p>
+                                    <p className="text-xs text-[var(--muted-foreground)] font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB • PDF</p>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                                    className="mt-6 flex items-center gap-2 text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest bg-red-50 px-4 py-2 rounded-full"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                    Remove File
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="w-20 h-20 rounded-2xl bg-[var(--muted)] flex items-center justify-center mb-6 text-[var(--muted-foreground)] group-hover:text-[var(--primary)] transition-colors">
+                                    <Upload className="w-10 h-10" />
+                                </div>
+                                <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">Select PDF File</h3>
+                                <p className="text-sm text-[var(--muted-foreground)] max-w-[200px]">
+                                    Drag and drop your textbook PDF here or click to browse
+                                </p>
+                            </>
+                        )}
                     </div>
-                )}
-
-                {/* Submit button */}
-                <button
-                    onClick={handleSubmit}
-                    disabled={!file || !title || status === 'uploading' || status === 'ingesting'}
-                    className="mt-6 w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 bg-gradient-to-r from-purple-600 to-violet-500 hover:from-purple-500 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
-                >
-                    {status === 'uploading' || status === 'ingesting' ? (
-                        <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Processing...
-                        </span>
-                    ) : (
-                        'Upload & Queue Ingestion'
-                    )}
-                </button>
-
-                {status === 'success' && (
-                    <p className="mt-4 text-sm text-[var(--muted-foreground)] text-center">
-                        To start processing, call <code className="px-2 py-1 rounded bg-[var(--muted)] text-purple-400">POST /api/worker/ingest</code> with your WORKER_SECRET, or click &ldquo;Run Worker&rdquo; on the Books page.
-                    </p>
-                )}
+                </div>
             </div>
         </div>
     );
