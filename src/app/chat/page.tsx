@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
     Send,
@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import type { Citation } from '@/lib/supabase/types';
 import { v4 as uuidv4 } from 'uuid';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -45,11 +47,11 @@ interface BookOption {
 
 export default function ChatPage() {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [currentSessionId, setCurrentSessionId] = useState<string>('');
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [books, setBooks] = useState<BookOption[]>([]);
-    const [selectedBookId, setSelectedBookId] = useState<string>('');
+    const [selectedBookId, setSelectedBookId] = useState('');
     const [showSources, setShowSources] = useState(false);
     const [showSidebar, setShowSidebar] = useState(true);
     const [activeCitations, setActiveCitations] = useState<Citation[]>([]);
@@ -75,50 +77,60 @@ export default function ChatPage() {
 
     // Initial load: Migrate old data and load sessions
     useEffect(() => {
-        const savedSessions = localStorage.getItem('necta_sessions');
-        const oldHistory = localStorage.getItem('necta_chat_history');
+        const initialize = async () => {
+            if (typeof window === 'undefined') return;
 
-        let initialSessions: ChatSession[] = [];
-
-        if (savedSessions) {
-            try {
-                initialSessions = JSON.parse(savedSessions);
-            } catch (e) {
-                console.error('Failed to parse sessions', e);
-            }
-        } else if (oldHistory) {
-            try {
-                const msgs = JSON.parse(oldHistory);
-                if (Array.isArray(msgs) && msgs.length > 0) {
-                    const id = uuidv4();
-                    const firstMsg = msgs.find((m: Message) => m.role === 'user')?.content || 'New Chat';
-                    initialSessions = [{
-                        id,
-                        title: firstMsg.slice(0, 40) + (firstMsg.length > 40 ? '...' : ''),
-                        messages: msgs,
-                        updatedAt: Date.now()
-                    }];
-                    localStorage.removeItem('necta_chat_history');
+            let initialSessions: ChatSession[] = [];
+            const saved = localStorage.getItem('necta_sessions');
+            if (saved) {
+                try {
+                    initialSessions = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse sessions', e);
                 }
-            } catch (e) {
-                console.error('Migration failed', e);
             }
-        }
 
-        if (initialSessions.length > 0) {
-            setSessions(initialSessions);
-            setCurrentSessionId(initialSessions[0].id);
-            setSelectedBookId(initialSessions[0].selectedBookId || '');
-        } else {
-            startNewChat([]);
-        }
+            // Migration logic
+            if (initialSessions.length === 0) {
+                const oldHistory = localStorage.getItem('necta_chat_history');
+                if (oldHistory) {
+                    try {
+                        const msgs = JSON.parse(oldHistory) as Message[];
+                        if (msgs.length > 0) {
+                            initialSessions = [{
+                                id: uuidv4(),
+                                title: msgs[0].content.slice(0, 30) + (msgs[0].content.length > 30 ? '...' : ''),
+                                messages: msgs,
+                                updatedAt: Date.now()
+                            }];
+                            localStorage.removeItem('necta_chat_history');
+                        }
+                    } catch (e) {
+                        console.error('Migration failed', e);
+                    }
+                }
+            }
 
-        setIsLoaded(true);
+            if (initialSessions.length > 0) {
+                setSessions(initialSessions);
+                setCurrentSessionId(initialSessions[0].id);
+                setSelectedBookId(initialSessions[0].selectedBookId || '');
+            } else {
+                startNewChat([]);
+            }
 
-        fetch('/api/books')
-            .then((r) => r.json())
-            .then((d) => setBooks(d.books || []))
-            .catch(() => { });
+            setIsLoaded(true);
+
+            try {
+                const r = await fetch('/api/books');
+                const d = await r.json();
+                setBooks(d.books || []);
+            } catch (error) {
+                console.error('Failed to fetch books', error);
+            }
+        };
+
+        initialize();
     }, []);
 
     useEffect(() => {
@@ -226,30 +238,86 @@ export default function ChatPage() {
     };
 
     const renderContentWithFootnotes = (content: string) => {
-        const parts = content.split(/(\[\d+(?:,\s*\d+)*\])/g);
+        const renderTextWithCitations = (text: string) => {
+            const parts = text.split(/(\[\d+(?:,\s*\d+)*\])/g);
+            return parts.map((part, idx) => {
+                const match = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
+                if (match) {
+                    return (
+                        <sup
+                            key={idx}
+                            className="text-[var(--primary)] font-semibold text-[0.65em] cursor-default hover:text-[var(--accent-blue)] transition-colors px-0.5"
+                            title={`Source ${match[1]}`}
+                        >
+                            [{match[1]}]
+                        </sup>
+                    );
+                }
+                return <span key={idx}>{part}</span>;
+            });
+        };
+
+        const MarkdownComponents: Record<string, React.FC<{ children?: React.ReactNode }>> = {
+            p: ({ children }) => (
+                <p className="mb-4 last:mb-0 leading-relaxed text-[var(--foreground)] opacity-90">
+                    {children}
+                </p>
+            ),
+            li: ({ children }) => (
+                <li className="mb-2 last:mb-0 leading-relaxed text-[var(--foreground)] opacity-90">
+                    {children}
+                </li>
+            ),
+            ul: ({ children }) => <ul className="list-disc pl-5 mb-4 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal pl-5 mb-4 space-y-1">{children}</ol>,
+            h1: ({ children }) => <h1 className="text-xl font-bold font-display mt-6 mb-3 gradient-text tracking-tight uppercase">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-bold font-display mt-5 mb-2 text-[var(--foreground)] tracking-tight">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-bold font-display mt-4 mb-2 text-[var(--foreground)]">{children}</h3>,
+            strong: ({ children }) => <strong className="font-bold text-[var(--foreground)]">{children}</strong>,
+            em: ({ children }) => <em className="italic opacity-80">{children}</em>,
+            code: ({ children }) => <code className="bg-[var(--muted)] px-1.5 py-0.5 rounded text-sm font-mono text-[var(--accent-blue)]">{children}</code>,
+        };
+
+        const processNode = (node: React.ReactNode): React.ReactNode => {
+            if (typeof node === 'string') return renderTextWithCitations(node);
+            if (Array.isArray(node)) return node.map((child, i) => <span key={i}>{processNode(child)}</span>);
+
+            // For other elements, we need to recursively handle children if they exist
+            if (React.isValidElement(node)) {
+                const element = node as React.ReactElement<{ children?: React.ReactNode }>;
+                if (element.props && element.props.children) {
+                    return React.cloneElement(element, {
+                        ...element.props,
+                        children: processNode(element.props.children)
+                    } as React.Attributes);
+                }
+            }
+            return node;
+        };
+
+        const WrappedComponents: Record<string, React.FC<Record<string, unknown>>> = {};
+        Object.keys(MarkdownComponents).forEach((key) => {
+            const Component = MarkdownComponents[key];
+            WrappedComponents[key] = (props: Record<string, unknown>) => {
+                const { children } = props;
+                return <Component {...props}>{processNode(children as React.ReactNode)}</Component>;
+            };
+        });
+
         return (
-            <div className="whitespace-pre-wrap">
-                {parts.map((part, idx) => {
-                    const match = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
-                    if (match) {
-                        return (
-                            <sup
-                                key={idx}
-                                className="text-[var(--primary)] font-semibold text-[0.65em] cursor-default hover:text-[var(--accent-blue)] transition-colors"
-                                title={`Source ${match[1]}`}
-                            >
-                                [{match[1]}]
-                            </sup>
-                        );
-                    }
-                    return <span key={idx}>{part}</span>;
-                })}
+            <div className="markdown-content animate-fade-in">
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={WrappedComponents}
+                >
+                    {content}
+                </ReactMarkdown>
             </div>
         );
     };
 
     const getUsedFootnoteNumbers = (content: string): Set<number> => {
-        const matches = content.matchAll(/\[(\d+)\]/g);
+        const matches = [...content.matchAll(/\[(\d+)\]/g)];
         const nums = new Set<number>();
         for (const m of matches) {
             nums.add(parseInt(m[1], 10));

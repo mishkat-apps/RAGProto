@@ -1,0 +1,8 @@
+﻿
+D:\CodeBase\RagProto\src\app\chat\page.tsx
+  292:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  298:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  301:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 3 problems (3 errors, 0 warnings)
+
