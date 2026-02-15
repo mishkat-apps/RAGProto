@@ -1,22 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-// Manual loading of .env.local if needed (fallback if process.env.NEXT_PUBLIC_SUPABASE_URL is missing)
-try {
-    const envLocalPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envLocalPath)) {
-        const envLocal = fs.readFileSync(envLocalPath, 'utf8');
-        envLocal.split('\n').forEach(line => {
-            const [key, ...valueParts] = line.split('=');
-            if (key && valueParts.length > 0) {
-                const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
-                process.env[key.trim()] = value;
-            }
-        });
-    }
-} catch (err) {
-    console.warn('Warning: Failed to load .env.local manually', err);
-}
+import './env-init';
 
 import { getSupabaseAdmin } from '../src/lib/supabase/admin';
 import { extractEntities } from '../src/lib/rag/graph';

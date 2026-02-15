@@ -13,30 +13,38 @@ export async function getVertexAuth() {
     const env = getEnv();
 
     try {
-        if (env.GOOGLE_SERVICE_ACCOUNT) {
-            log.debug('Using service account from environment variable');
-            const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
-            return new GoogleAuth({
-                credentials,
-                scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            });
-        }
-
+        // Prioritize explicit GOOGLE_APPLICATION_CREDENTIALS (file path) or ADC
         if (env.GOOGLE_APPLICATION_CREDENTIALS) {
-            log.debug({ path: env.GOOGLE_APPLICATION_CREDENTIALS }, 'Using service account from key file');
+            log.info({ path: env.GOOGLE_APPLICATION_CREDENTIALS }, 'Attempting authentication with service account key file');
             return new GoogleAuth({
                 keyFilename: env.GOOGLE_APPLICATION_CREDENTIALS,
                 scopes: ['https://www.googleapis.com/auth/cloud-platform'],
             });
         }
 
-        log.debug('Using Application Default Credentials');
+        // Fallback to GOOGLE_SERVICE_ACCOUNT (JSON string) for Vercel/CI
+        if (env.GOOGLE_SERVICE_ACCOUNT) {
+            log.info('Attempting authentication with GOOGLE_SERVICE_ACCOUNT JSON string');
+            try {
+                const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
+                return new GoogleAuth({
+                    credentials,
+                    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+                });
+            } catch (parseErr) {
+                log.error({ error: parseErr instanceof Error ? parseErr.message : String(parseErr) }, 'Failed to parse GOOGLE_SERVICE_ACCOUNT JSON string.');
+                throw parseErr;
+            }
+        }
+
+        log.info('No explicit credentials found. Attempting Application Default Credentials (ADC)');
         return new GoogleAuth({
             scopes: ['https://www.googleapis.com/auth/cloud-platform'],
         });
     } catch (err) {
-        log.error({ error: err instanceof Error ? err.message : String(err) }, 'Failed to initialize Google Auth');
-        throw new Error('Could not initialize Google Cloud authentication. Check GOOGLE_SERVICE_ACCOUNT or ADC.');
+        const message = err instanceof Error ? err.message : String(err);
+        log.error({ error: message }, 'Failed to initialize Google Auth');
+        throw new Error(`Could not initialize Google Cloud authentication: ${message}`);
     }
 }
 

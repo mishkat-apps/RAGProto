@@ -1,51 +1,19 @@
-import fs from 'fs';
-import path from 'path';
-import { genkit, z } from 'genkit';
-import { vertexAI } from '@genkit-ai/vertexai';
+import './env-init';
+
+import { ai, z } from '../src/lib/genkit';
 import { createClient } from '@supabase/supabase-js';
 
-// --- 1. Load Environment Variables ---
-const env: Record<string, string> = {};
-try {
-    const envLocalPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envLocalPath)) {
-        const envLocal = fs.readFileSync(envLocalPath, 'utf8');
-        envLocal.split('\n').forEach(line => {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith('#')) return;
-            const [key, ...valueParts] = trimmed.split('=');
-            if (key && valueParts.length > 0) {
-                const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
-                env[key.trim()] = value;
-                process.env[key.trim()] = value;
-            }
-        });
-    }
-} catch (err) {
-    console.error('Failed to load .env.local', err);
-    process.exit(1);
-}
-
-const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
-const VERTEX_PROJECT_ID = env.VERTEX_PROJECT_ID;
-const VERTEX_LOCATION = env.VERTEX_LOCATION || 'us-central1';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const VERTEX_PROJECT_ID = process.env.VERTEX_PROJECT_ID;
+const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !VERTEX_PROJECT_ID) {
-    console.error('Missing required environment variables (SUPABASE_URL, SERVICE_KEY, VERTEX_PROJECT_ID)');
+    console.error('❌ Missing required environment variables (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VERTEX_PROJECT_ID)');
     process.exit(1);
 }
 
-// --- 2. Initialize Clients ---
-const ai = genkit({
-    plugins: [
-        vertexAI({
-            projectId: VERTEX_PROJECT_ID,
-            location: VERTEX_LOCATION,
-        }),
-    ],
-    model: 'vertexai/gemini-2.0-flash',
-});
+// (Genkit logic is now handled by the imported 'ai' instance)
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: { persistSession: false },

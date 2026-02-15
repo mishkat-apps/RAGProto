@@ -15,17 +15,19 @@ if (env.GOOGLE_SERVICE_ACCOUNT) {
     try {
         vertexConfig.credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
     } catch (err) {
-        console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT JSON in Genkit init');
+        console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT JSON in Genkit init');
     }
 } else if (env.GOOGLE_APPLICATION_CREDENTIALS && typeof window === 'undefined') {
     // If we have a file path and we are on the server (node), ensure it's in process.env
     // The underlying Google SDK used by Genkit will pick it up from process.env.GOOGLE_APPLICATION_CREDENTIALS
     process.env.GOOGLE_APPLICATION_CREDENTIALS = env.GOOGLE_APPLICATION_CREDENTIALS;
+} else if (typeof window === 'undefined') {
+    console.warn('⚠️ No explicit Google credentials found. Genkit will try to use Application Default Credentials.');
 }
 
 export const ai = genkit({
     plugins: [
         vertexAI(vertexConfig),
     ],
-    model: 'vertexai/gemini-1.5-flash', // Default model for fast extraction/classification
+    model: 'vertexai/gemini-1.5-flash-002', // Default model for fast extraction/classification
 });
