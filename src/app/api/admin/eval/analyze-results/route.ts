@@ -6,36 +6,49 @@ const log = createChildLogger('api-admin-eval-analyze');
 
 export async function POST(request: NextRequest) {
     try {
-        const { results } = await request.json().catch(() => ({}));
+        const { results, question } = await request.json().catch(() => ({}));
 
-        if (!results || !Array.isArray(results) || results.length === 0) {
-            return NextResponse.json({ error: 'Results are required' }, { status: 400 });
+        if (!results || !question) {
+            return NextResponse.json({ error: 'Comparison results and question are required' }, { status: 400 });
         }
 
         const env = getEnv();
 
-        // 1. Construct the analysis prompt
-        const resultsSummary = results.map((r, i) => `
-Question ${i + 1}: ${r.question}
-Answer: ${r.answer}
-Confidence: ${r.confidence}
-Citations count: ${r.citations?.length || 0}
-`).join('\n---\n');
+        // 1. Construct the comparison analysis prompt
+        const comparisonSummary = `
+Question: ${question}
 
-        const prompt = `You are an AI Quality Assurance expert. You will analyze the following RAG (Retrieval-Augmented Generation) evaluation results and provide a comprehensive, professional report.
+--- STANDARD RAG ---
+Answer: ${results.rag?.answer || 'N/A'}
+Confidence: ${results.rag?.confidence || 'N/A'}
+Citations: ${results.rag?.citations?.length || 0}
 
-EVALUATION DATA:
-${resultsSummary}
+--- CAG (FULL CONTEXT) ---
+Answer: ${results.cag?.answer || 'N/A'}
+Confidence: ${results.cag?.confidence || 'N/A'}
+Citations: ${results.cag?.citations?.length || 0}
+
+--- GRAPHRAG (ENTITIES + HYBRID) ---
+Answer: ${results.graph?.answer || 'N/A'}
+Confidence: ${results.graph?.confidence || 'N/A'}
+Citations: ${results.graph?.citations?.length || 0}
+`;
+
+        const prompt = `You are an AI RAG Specialist. You are comparing three different retrieval strategies for a Tanzanian educational platform.
+Analyze the following answers provided by different RAG modes for the SAME question and provide a professional comparison report.
+
+COMPARISON DATA:
+${comparisonSummary}
 
 REPORT STRUCTURE:
-1. **Performance Overview**: A summary of overall performance. Calculate approximate success rate (High Confidence vs Others).
-2. **Confidence Analysis**: Discuss the distribution of confidence levels.
-3. **Citation & Source Evaluation**: Evaluate the usage of citations. Are there enough citations? Are they consistent?
-4. **Key Strengths**: What did the system do well?
-5. **Identified Weaknesses & Issues**: Point out specific questions where the system struggled or provided unsatisfactory answers.
-6. **Actionable Recommendations**: Give 3-5 specific technical recommendations to improve the RAG pipeline (e.g., chunk size, embedding model, reranking, system prompt).
+1. **Comparative Analysis**: Compare the accuracy, depth, and tone of each mode. Which one followed the NECTA curriculum requirements best?
+2. **Retrieval Efficacy**: Evaluate which mode provided the most relevant/comprehensive answer. (Standard vs Full Context vs Graph).
+3. **Citation Quality**: Comment on the transparency and source attribution of each mode.
+4. **Winner for this Query**: Declare which mode "won" for this specific question and why.
+5. **Technical Insights**: Provide 2-3 specific insights on why one mode outperformed the others (e.g., "Standard RAG missed context X which CAG caught", or "GraphRAG successfully linked entity Y").
+6. **Recommendations**: Suggest one improvement for the overall pipeline based on these results.
 
-Format the output in clean Markdown. Use headings, bullet points, and bold text for readability.`;
+Format the output in clean Markdown. Use headings, tables for comparison if helpful, and bold text for key points.`;
 
         // 2. Call Gemini API
         const { getVertexAccessToken } = await import('@/lib/vertex/auth');

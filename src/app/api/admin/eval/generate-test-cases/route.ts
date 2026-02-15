@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
         const start = Math.floor(Math.random() * Math.max(0, markdown.length - 8000));
         const snippet = markdown.substring(start, start + 8000);
 
-        // 4. Generate 3 questions using Gemini
+        // 4. Generate 1 high-quality question using Gemini
         const prompt = `You are an educational content creator specializing in the Tanzanian NECTA curriculum.
-Based on the following textbook snippet from "${book.title}", generate 3 diverse and high-quality test questions that a student might ask.
+Based on the following textbook snippet from "${book.title}", generate 1 diverse and high-quality test question that a student might ask.
 
 Snippet:
 """
@@ -58,18 +58,13 @@ ${snippet}
 """
 
 Requirements:
-- Generate exactly 3 questions.
-- Question 1: A direct fact-based question.
-- Question 2: An explanatory "how" or "why" question.
-- Question 3: A short answer conceptual question.
-- Ensure the questions are based ONLY on the provided snippet.
+- Generate exactly 1 question.
+- Ensure the question is based ONLY on the provided snippet.
 - Return ONLY a JSON array of objects with a "question" field.
 
 Example format:
 [
-  { "question": "What are the three main types of rocks?" },
-  { "question": "Explain why sedimentary rocks often contain fossils." },
-  { "question": "Define the term 'metamorphism' in the context of geology." }
+  { "question": "What are the three main types of rocks?" }
 ]`;
 
         const { getVertexAccessToken } = await import('@/lib/vertex/auth');
