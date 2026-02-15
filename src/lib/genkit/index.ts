@@ -14,7 +14,9 @@ const vertexConfig: any = {
 // Add explicit credentials if available
 if (env.GOOGLE_SERVICE_ACCOUNT) {
     try {
-        vertexConfig.credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
+        vertexConfig.googleAuth = {
+            credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT)
+        };
     } catch (err) {
         console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT JSON');
     }
@@ -23,7 +25,9 @@ if (env.GOOGLE_SERVICE_ACCOUNT) {
     if (fs.existsSync(path)) {
         try {
             const raw = fs.readFileSync(path, 'utf8');
-            vertexConfig.credentials = JSON.parse(raw);
+            vertexConfig.googleAuth = {
+                credentials: JSON.parse(raw)
+            };
         } catch (err) {
             console.error('❌ Failed to read or parse credentials file:', err);
         }
