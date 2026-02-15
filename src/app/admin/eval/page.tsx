@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
     Play,
     Loader2,
@@ -11,6 +13,8 @@ import {
     Trash2,
     MessageSquarePlus,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     Settings2,
     CheckCircle2,
     AlertCircle,
@@ -51,6 +55,7 @@ export default function EvalPage() {
     const [analyzing, setAnalyzing] = useState(false);
     const [aiReport, setAiReport] = useState<string | null>(null);
     const [showConfig, setShowConfig] = useState(true);
+    const carouselRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetch('/api/books')
@@ -91,7 +96,6 @@ export default function EvalPage() {
         setLoading(true);
         setAiReport(null);
         setComparison(null);
-        // Collapse config on mobile/small screens after running
         if (window.innerWidth < 1024) setShowConfig(false);
 
         try {
@@ -126,7 +130,6 @@ export default function EvalPage() {
             const data = await res.json();
             if (data.report) {
                 setAiReport(data.report);
-                // Smooth scroll to report
                 setTimeout(() => {
                     document.getElementById('ai-report')?.scrollIntoView({ behavior: 'smooth' });
                 }, 100);
@@ -141,9 +144,14 @@ export default function EvalPage() {
         }
     };
 
+    const scrollCarousel = (direction: 'left' | 'right') => {
+        if (!carouselRef.current) return;
+        const scrollAmount = direction === 'left' ? -carouselRef.current.offsetWidth : carouselRef.current.offsetWidth;
+        carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    };
+
     return (
         <div className="min-h-screen bg-[#F8FAFB] pb-20 px-4 sm:px-6 lg:px-8">
-            {/* Header Section */}
             <header className="max-w-7xl mx-auto pt-8 pb-12">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="animate-fade-in">
@@ -175,15 +183,12 @@ export default function EvalPage() {
             <main className="max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                    {/* Left Panel: Configuration */}
-                    <aside className={`lg:col-span-4 transition-all duration-500 ease-in-out ${showConfig ? 'block' : 'hidden lg:block'}`}>
-                        <div className="bg-white rounded-[2rem] p-8 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] border border-slate-100/50 sticky top-8">
-                            <div className="flex items-center justify-between mb-8">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 bg-slate-50 rounded-xl">
-                                        <Settings2 className="w-5 h-5 text-slate-400" />
-                                    </div>
-                                    <h2 className="text-xl font-bold text-slate-800">Parameters</h2>
+                    <aside className={`lg:col-span-3 transition-all duration-500 ease-in-out ${showConfig ? 'block' : 'hidden lg:block'}`}>
+                        <div className="bg-white rounded-[2rem] p-6 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] border border-slate-100/50 sticky top-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-2">
+                                    <Settings2 className="w-4 h-4 text-slate-400" />
+                                    <h2 className="text-lg font-bold text-slate-800 tracking-tight">Setup</h2>
                                 </div>
                                 <button
                                     onClick={() => setShowConfig(!showConfig)}
@@ -193,188 +198,178 @@ export default function EvalPage() {
                                 </button>
                             </div>
 
-                            <div className="space-y-8">
-                                {/* Book Select */}
-                                <div className="space-y-3">
-                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Info className="w-3.5 h-3.5" />
-                                        Source Material
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                                        Subject Material
                                     </label>
                                     <div className="relative group">
                                         <select
                                             value={selectedBookId}
                                             onChange={(e) => setSelectedBookId(e.target.value)}
-                                            className="w-full pl-5 pr-12 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white focus:outline-none appearance-none transition-all text-sm font-semibold text-slate-700 shadow-sm group-hover:bg-slate-100/50"
+                                            className="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white focus:outline-none appearance-none transition-all text-xs font-bold text-slate-700 shadow-sm"
                                         >
                                             {books.map(b => (
-                                                <option key={b.id} value={b.id}>{b.title} (Form {b.form})</option>
+                                                <option key={b.id} value={b.id}>{b.title}</option>
                                             ))}
                                         </select>
-                                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                                     </div>
                                 </div>
 
-                                {/* Question Input Area */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <MessageSquarePlus className="w-3.5 h-3.5" />
-                                            Test Query
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between pl-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            The Question
                                         </label>
                                         {currentQuestion && (
                                             <button
                                                 onClick={() => setCurrentQuestion('')}
-                                                className="text-[10px] font-bold text-red-400 hover:text-red-600 transition-colors uppercase tracking-widest flex items-center gap-1.5"
+                                                className="text-[9px] font-black text-red-400 hover:text-red-500 transition-colors uppercase"
                                             >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                Reset
+                                                Clear
                                             </button>
                                         )}
                                     </div>
-                                    <div className="relative group">
-                                        <textarea
-                                            value={currentQuestion}
-                                            onChange={(e) => setCurrentQuestion(e.target.value)}
-                                            placeholder="Type a custom query or let AI generate one..."
-                                            className="w-full h-44 px-6 py-5 rounded-[1.5rem] bg-slate-50 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white focus:outline-none transition-all text-sm leading-relaxed font-medium text-slate-700 resize-none shadow-sm placeholder:text-slate-300"
-                                        />
-                                        <div className="absolute bottom-4 right-4 flex items-center gap-2">
-                                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">
-                                                {currentQuestion.length} Chars
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <textarea
+                                        value={currentQuestion}
+                                        onChange={(e) => setCurrentQuestion(e.target.value)}
+                                        placeholder="Type or generate a question..."
+                                        className="w-full h-32 px-4 py-4 rounded-xl bg-slate-50 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white focus:outline-none transition-all text-xs leading-relaxed font-bold text-slate-700 resize-none shadow-sm"
+                                    />
                                 </div>
 
-                                {/* Generation Tool */}
                                 <button
                                     onClick={generateTestCase}
-                                    disabled={generating || !selectedBookId}
-                                    className="w-full py-4 rounded-2xl bg-indigo-50 hover:bg-indigo-600 group text-indigo-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                                    disabled={generating}
+                                    className="w-full py-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-600 group text-indigo-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {generating ? (
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="w-5 h-5 animate-float" />
-                                    )}
-                                    <span className="text-sm font-bold tracking-wide">Generate Pro-Level Question</span>
+                                    {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                    <span className="text-[11px] font-black uppercase tracking-wider">Generate Question</span>
                                 </button>
                             </div>
                         </div>
                     </aside>
 
-                    {/* Right Panel: Results */}
-                    <div className="lg:col-span-8 space-y-8">
+                    <div className={`lg:col-span-9 space-y-8 ${showConfig ? 'lg:col-span-9' : 'lg:col-span-12'}`}>
                         {loading ? (
-                            <div className="bg-white rounded-[2rem] p-20 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 animate-pulse-glow">
-                                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-8">
-                                    <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-slate-800 mb-3">Orchestrating Triple-RAG Benchmark</h3>
-                                <p className="text-slate-500 max-w-sm">Comparing Standard Vector Search, Full-Context CAG, and Knowledge Graph retrieval in parallel...</p>
-                                <div className="mt-8 flex gap-3">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" />
-                                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce [animation-delay:-0.15s]" />
-                                    <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.3s]" />
-                                </div>
+                            <div className="bg-white rounded-[2rem] p-20 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 animate-pulse-glow min-h-[500px]">
+                                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-6" />
+                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Benchmarking Triple RAG</h3>
+                                <p className="text-slate-500">Wait as we analyze across Standard, CAG, and Graph modes...</p>
                             </div>
                         ) : !comparison ? (
-                            <div className="bg-white rounded-[2rem] p-20 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 border-dashed border-2">
-                                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-8">
-                                    <ClipboardList className="w-10 h-10 text-slate-300" />
+                            <div className="bg-white rounded-[2rem] p-20 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 border-dashed border-2 min-h-[500px]">
+                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                                    <ClipboardList className="w-8 h-8 text-slate-300" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-slate-300 mb-3">Ready for Benchmarking</h3>
-                                <p className="text-slate-400 max-w-sm">Select a textbook and provide a question to start the side-by-side strategy comparison.</p>
-                                <button
-                                    onClick={() => setShowConfig(true)}
-                                    className="mt-8 text-indigo-500 font-bold text-sm uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all lg:hidden"
-                                >
-                                    Open Settings <ArrowRight className="w-4 h-4" />
-                                </button>
+                                <h3 className="text-xl font-bold text-slate-400">Ready to compare</h3>
+                                <p className="text-slate-400 mt-2 max-w-xs mx-auto text-sm">Select a textbook and a question to see how different search strategies perform.</p>
                             </div>
                         ) : (
                             <div className="space-y-10 animate-slide-up">
-                                {/* Comparison Grid */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <ResultCard
-                                        title="Standard"
-                                        badge="Fastest"
-                                        description="Reranked Vector Search"
-                                        color="emerald"
-                                        result={comparison.results.rag}
-                                    />
-                                    <ResultCard
-                                        title="Context"
-                                        badge="Accurate"
-                                        description="Full Book Context (CAG)"
-                                        color="amber"
-                                        result={comparison.results.cag}
-                                    />
-                                    <ResultCard
-                                        title="GraphRAG"
-                                        badge="Intelligent"
-                                        description="Entity-Linked Hybrid"
-                                        color="indigo"
-                                        result={comparison.results.graph}
-                                    />
+                                {/* Carousel Section */}
+                                <div className="relative group/carousel">
+                                    <div
+                                        ref={carouselRef}
+                                        className="flex gap-6 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-6 scroll-smooth px-2"
+                                    >
+                                        <div className="snap-center shrink-0 w-full md:w-[450px]">
+                                            <ResultCard
+                                                title="Standard"
+                                                badge="Fastest"
+                                                description="Reranked Vector Search"
+                                                color="emerald"
+                                                result={comparison.results.rag}
+                                            />
+                                        </div>
+                                        <div className="snap-center shrink-0 w-full md:w-[450px]">
+                                            <ResultCard
+                                                title="Context"
+                                                badge="Deep Context"
+                                                description="Full Book Context (CAG)"
+                                                color="amber"
+                                                result={comparison.results.cag}
+                                            />
+                                        </div>
+                                        <div className="snap-center shrink-0 w-full md:w-[450px]">
+                                            <ResultCard
+                                                title="GraphRAG"
+                                                badge="Intelligent"
+                                                description="Entity-Linked Hybrid"
+                                                color="indigo"
+                                                result={comparison.results.graph}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Navigation Arrows */}
+                                    <button
+                                        onClick={() => scrollCarousel('left')}
+                                        className="absolute left-[-20px] top-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all opacity-0 group-hover/carousel:opacity-100 hidden md:flex border border-slate-100"
+                                    >
+                                        <ChevronLeft className="w-6 h-6" />
+                                    </button>
+                                    <button
+                                        onClick={() => scrollCarousel('right')}
+                                        className="absolute right-[-20px] top-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all opacity-0 group-hover/carousel:opacity-100 hidden md:flex border border-slate-100"
+                                    >
+                                        <ChevronRight className="w-6 h-6" />
+                                    </button>
+
+                                    {/* Mobile Indicator */}
+                                    <div className="flex justify-center gap-1.5 mt-2 md:hidden">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                                    </div>
                                 </div>
 
                                 {/* Report Action */}
-                                <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-8">
-                                    <div className="flex items-center gap-6 text-center md:text-left">
-                                        <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center relative flex-shrink-0">
-                                            <Sparkles className="w-8 h-8 text-indigo-600" />
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full border-4 border-white animate-pulse" />
+                                <div className="bg-white rounded-[2rem] p-8 shadow-[0_15px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="flex items-center gap-5 text-center md:text-left">
+                                        <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                            <Sparkles className="w-6 h-6 text-indigo-600 animate-float" />
                                         </div>
                                         <div>
-                                            <h3 className="text-2xl font-bold text-slate-800">Generate Intelligent Verdict</h3>
-                                            <p className="text-slate-500 mt-1">Let LLM analyze the retrieval quality and pick the definitive winner.</p>
+                                            <h3 className="text-xl font-bold text-slate-800 tracking-tight">AI Benchmark Verdict</h3>
+                                            <p className="text-slate-500 mt-0.5 text-sm">Compare strategies and discover which mode provided the best answer.</p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={generateAiReport}
                                         disabled={analyzing}
-                                        className="w-full md:w-auto px-10 py-5 bg-indigo-600 rounded-2xl text-white font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                        className="w-full md:w-auto px-8 py-4 bg-indigo-600 rounded-2xl text-white text-sm font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                     >
-                                        {analyzing ? (
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                        ) : (
-                                            <BarChart3 className="w-5 h-5" />
-                                        )}
-                                        {analyzing ? 'Analyzing Strategies...' : 'Request AI Report'}
+                                        {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+                                        {analyzing ? 'Analyzing Performance...' : 'Generate Verdict Report'}
                                     </button>
                                 </div>
 
-                                {/* Markdown Report */}
+                                {/* AI Markdown Report */}
                                 {aiReport && (
-                                    <article id="ai-report" className="bg-white rounded-[2.5rem] p-12 shadow-2xl shadow-indigo-100/50 border border-slate-100 animate-slide-up relative overflow-hidden">
+                                    <article id="ai-report" className="bg-white rounded-[2.5rem] p-10 md:p-14 shadow-[0_25px_80px_-20px_rgba(0,0,0,0.08)] border border-slate-100 animate-slide-up relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-                                            <Sparkles className="w-64 h-64 text-indigo-600" />
+                                            <Beaker className="w-64 h-64 text-indigo-600" />
                                         </div>
                                         <div className="relative">
-                                            <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-50 rounded-full text-indigo-600 text-[10px] font-black uppercase tracking-widest mb-8">
+                                            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50 rounded-full text-indigo-600 text-[10px] font-black uppercase tracking-widest mb-10">
                                                 <Star className="w-3.5 h-3.5 fill-current" />
-                                                Benchmark Verdict
+                                                Benchmark Analysis
                                             </div>
+
                                             <div className="prose prose-slate max-w-none 
-                                                prose-h1:text-4xl prose-h1:font-black prose-h1:tracking-tight prose-h1:text-slate-900 
-                                                prose-h2:text-2xl prose-h2:font-bold prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-indigo-900 
-                                                prose-strong:text-indigo-800 prose-strong:font-bold
+                                                prose-h1:text-3xl prose-h1:font-black prose-h1:tracking-tight prose-h1:text-slate-900 prose-h1:mb-8
+                                                prose-h2:text-xl prose-h2:font-bold prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-indigo-900 prose-h2:flex prose-h2:items-center prose-h2:gap-3
                                                 prose-p:text-slate-600 prose-p:leading-8 prose-p:text-lg
+                                                prose-strong:text-slate-900 prose-strong:font-bold
                                                 prose-li:text-slate-600 prose-li:text-lg
-                                                prose-table:border prose-table:rounded-2xl prose-table:overflow-hidden
-                                                prose-th:bg-slate-50 prose-th:px-6 prose-th:py-4 prose-th:text-xs prose-th:font-black prose-th:uppercase prose-th:tracking-widest
-                                                prose-td:px-6 prose-td:py-4 prose-td:border-t">
-                                                <div dangerouslySetInnerHTML={{
-                                                    __html: aiReport
-                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                                        .replace(/^# (.*$)/gim, '<h1 className="border-b pb-4 mb-4">$1</h1>')
-                                                        .replace(/^## (.*$)/gim, '<h2 className="flex items-center gap-2">$1</h2>')
-                                                        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                                                        .replace(/^\* (.*$)/gim, '<li className="source-list-item">$1</li>')
-                                                        .replace(/^\d\. (.*$)/gim, '<li className="ordered-list-item">$1</li>')
-                                                        .replace(/\n/g, '<br />')
-                                                }} />
+                                                prose-table:w-full prose-table:border-collapse prose-table:rounded-xl prose-table:overflow-hidden prose-table:my-8
+                                                prose-th:bg-slate-50 prose-th:text-slate-800 prose-th:font-black prose-th:text-[10px] prose-th:uppercase prose-th:tracking-widest prose-th:px-6 prose-th:py-4 prose-th:text-left prose-th:border-b
+                                                prose-td:px-6 prose-td:py-4 prose-td:text-sm prose-td:border-b prose-td:text-slate-600">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {aiReport}
+                                                </ReactMarkdown>
                                             </div>
                                         </div>
                                     </article>
@@ -426,14 +421,14 @@ function ResultCard({ title, badge, description, color, result }: {
     const confidenceValue = result.confidence === 'high' ? 95 : result.confidence === 'medium' ? 65 : 35;
 
     return (
-        <div className={`flex flex-col rounded-[2.5rem] overflow-hidden bg-white border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group`}>
+        <div className={`flex flex-col rounded-[2.5rem] overflow-hidden bg-white border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-[650px] group`}>
             {/* Card Header */}
             <div className={`p-8 ${style.light}`}>
                 <div className="flex items-center justify-between mb-4">
                     <span className={`px-4 py-1.5 ${style.bg} ${style.text} rounded-full text-[10px] font-black uppercase tracking-widest`}>
                         {badge}
                     </span>
-                    <div className={`${style.text} opacity-40 group-hover:opacity-100 transition-opacity`}>
+                    <div className={`${style.text} opacity-30 group-hover:opacity-100 transition-opacity`}>
                         {style.icon}
                     </div>
                 </div>
@@ -442,14 +437,14 @@ function ResultCard({ title, badge, description, color, result }: {
             </div>
 
             {/* Metrics */}
-            <div className="px-8 pt-8 space-y-6 flex-1">
+            <div className="px-8 flex-1 pt-8 overflow-hidden flex flex-col">
                 {/* Confidence Meter */}
-                <div className="space-y-3">
+                <div className="space-y-3 mb-8">
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <span>Confidence</span>
+                        <span>Reliability Score</span>
                         <span className={style.text}>{result.confidence}</span>
                     </div>
-                    <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden p-0.5 border border-slate-100">
+                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
                         <div
                             className={`h-full ${style.accent} rounded-full transition-all duration-1000 ease-out`}
                             style={{ width: `${confidenceValue}%` }}
@@ -458,38 +453,33 @@ function ResultCard({ title, badge, description, color, result }: {
                 </div>
 
                 {/* Answer Content */}
-                <div className="space-y-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Response</span>
-                    <div className="relative">
-                        <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 text-sm leading-relaxed text-slate-600 font-medium h-[280px] overflow-y-auto custom-scrollbar shadow-inner">
+                <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Output</span>
+                    <div className="relative flex-1 overflow-hidden bg-slate-50/50 rounded-2xl border border-slate-100 p-6 shadow-inner">
+                        <div className="h-full overflow-y-auto custom-scrollbar text-sm leading-relaxed text-slate-600 font-medium pr-2">
                             {result.error ? (
-                                <div className="flex items-center gap-2 text-red-500 font-bold italic">
+                                <div className="text-red-500 font-bold flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4" />
                                     {result.error}
                                 </div>
                             ) : result.answer}
                         </div>
-                        {/* Shimmer overlay for top/bottom of scroll */}
-                        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-slate-50 to-transparent pointer-events-none rounded-t-3xl" />
-                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none rounded-b-3xl" />
                     </div>
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-8 mt-auto border-t border-slate-50">
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Attributions</span>
-                        <span className="text-xs font-black text-slate-800">{result.citations?.length || 0} Source{result.citations?.length === 1 ? '' : 's'}</span>
-                    </div>
-                    <div className="flex -space-x-2">
-                        {[...Array(Math.min(3, result.citations?.length || 0))].map((_, i) => (
-                            <div key={i} className={`w-8 h-8 rounded-full border-2 border-white ${style.accent} flex items-center justify-center shadow-sm`}>
-                                <div className="w-1.5 h-1.5 bg-white rounded-full opacity-60" />
-                            </div>
-                        ))}
-                    </div>
+            {/* Card Footer */}
+            <div className="p-8 mt-auto border-t border-slate-50 flex items-center justify-between bg-slate-50/10">
+                <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Retrieved Data</span>
+                    <span className="text-sm font-black text-slate-800 tracking-tight">{result.citations?.length || 0} Segment{result.citations?.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="flex -space-x-2.5">
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} className={`w-9 h-9 rounded-full border-2 border-white ${style.accent} shadow-md flex items-center justify-center`}>
+                            <ArrowRight className="w-3 h-3 text-white opacity-40" />
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
