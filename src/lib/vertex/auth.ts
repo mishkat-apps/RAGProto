@@ -43,13 +43,22 @@ export async function getVertexAuth() {
             }
         }
 
+        log.info('Final attempt: falling back to Application Default Credentials (ADC)');
         return new GoogleAuth({
             scopes: ['https://www.googleapis.com/auth/cloud-platform'],
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error({ error: message }, 'Failed to initialize Google Auth');
-        throw new Error(`Could not initialize Google Cloud authentication: ${message}`);
+
+        let hint = '';
+        if (env.GOOGLE_APPLICATION_CREDENTIALS && !fs.existsSync(env.GOOGLE_APPLICATION_CREDENTIALS)) {
+            hint = ` (Hint: GOOGLE_APPLICATION_CREDENTIALS points to a file that does not exist: ${env.GOOGLE_APPLICATION_CREDENTIALS})`;
+        } else if (!env.GOOGLE_SERVICE_ACCOUNT) {
+            hint = ' (Hint: Try setting GOOGLE_SERVICE_ACCOUNT with your service account JSON string for serverless environments)';
+        }
+
+        throw new Error(`Could not initialize Google Cloud authentication: ${message}${hint}`);
     }
 }
 
