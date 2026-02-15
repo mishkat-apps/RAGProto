@@ -22,6 +22,14 @@ export async function getVertexAuth() {
             });
         }
 
+        if (env.GOOGLE_APPLICATION_CREDENTIALS) {
+            log.debug({ path: env.GOOGLE_APPLICATION_CREDENTIALS }, 'Using service account from key file');
+            return new GoogleAuth({
+                keyFilename: env.GOOGLE_APPLICATION_CREDENTIALS,
+                scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            });
+        }
+
         log.debug('Using Application Default Credentials');
         return new GoogleAuth({
             scopes: ['https://www.googleapis.com/auth/cloud-platform'],
