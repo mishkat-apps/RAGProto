@@ -16,22 +16,24 @@ if (env.GOOGLE_SERVICE_ACCOUNT) {
     try {
         vertexConfig.credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
     } catch (err) {
-        console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT JSON in Genkit init');
+        console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT JSON');
     }
 } else if (env.GOOGLE_APPLICATION_CREDENTIALS && typeof window === 'undefined') {
-    // If we have a file path and we are on the server (node), verify it exists
-    if (fs.existsSync(env.GOOGLE_APPLICATION_CREDENTIALS)) {
-        process.env.GOOGLE_APPLICATION_CREDENTIALS = env.GOOGLE_APPLICATION_CREDENTIALS;
-    } else {
-        console.warn(`⚠️ GOOGLE_APPLICATION_CREDENTIALS path specified (${env.GOOGLE_APPLICATION_CREDENTIALS}) but file not found. Skipping.`);
+    const path = env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (fs.existsSync(path)) {
+        try {
+            const raw = fs.readFileSync(path, 'utf8');
+            vertexConfig.credentials = JSON.parse(raw);
+        } catch (err) {
+            console.error('❌ Failed to read or parse credentials file:', err);
+        }
     }
-} else if (typeof window === 'undefined') {
-    console.warn('⚠️ No explicit Google credentials found. Genkit will try to use Application Default Credentials.');
 }
 
 export const ai = genkit({
     plugins: [
         vertexAI(vertexConfig),
     ],
-    model: 'vertexai/gemini-1.5-flash-002', // Default model for fast extraction/classification
+    // Favor the environment variable if set, otherwise fallback to a stable default
+    model: `vertexai/${env.GEMINI_MODEL || 'gemini-1.5-flash'}`,
 });

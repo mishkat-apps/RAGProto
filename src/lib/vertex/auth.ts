@@ -16,9 +16,7 @@ export async function getVertexAuth() {
 
     try {
         // 1. High Priority: GOOGLE_SERVICE_ACCOUNT (JSON string) 
-        // Best for Vercel, CI/CD, and environments without persistent disk access.
         if (env.GOOGLE_SERVICE_ACCOUNT) {
-            log.info('Using GOOGLE_SERVICE_ACCOUNT JSON string for authentication');
             try {
                 const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
                 return new GoogleAuth({
@@ -32,23 +30,19 @@ export async function getVertexAuth() {
         }
 
         // 2. Medium Priority: GOOGLE_APPLICATION_CREDENTIALS (file path)
-        // Usually for local development. We check if it exists to avoid ENOENT crashes.
         if (env.GOOGLE_APPLICATION_CREDENTIALS) {
             const path = env.GOOGLE_APPLICATION_CREDENTIALS;
             if (fs.existsSync(path)) {
-                log.info({ path }, 'Using service account key file for authentication');
                 return new GoogleAuth({
                     keyFilename: path,
                     scopes: ['https://www.googleapis.com/auth/cloud-platform'],
                 });
             } else {
-                log.warn({ path }, 'GOOGLE_APPLICATION_CREDENTIALS path specified but file not found. If on Vercel, use GOOGLE_SERVICE_ACCOUNT JSON string instead.');
+                log.warn({ path }, 'GOOGLE_APPLICATION_CREDENTIALS path specified but file not found.');
                 // Fall through to ADC
             }
         }
 
-        // 3. Fallback: Application Default Credentials (ADC)
-        log.info('No explicit credentials found. Attempting Application Default Credentials (ADC)');
         return new GoogleAuth({
             scopes: ['https://www.googleapis.com/auth/cloud-platform'],
         });
