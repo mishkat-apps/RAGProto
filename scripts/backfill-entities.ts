@@ -18,10 +18,10 @@ try {
     console.warn('Warning: Failed to load .env.local manually', err);
 }
 
-import { getSupabaseAdmin } from '../src/lib/supabase/admin.ts';
-import { extractEntities } from '../src/lib/rag/graph.ts';
-import { batchProcess } from '../src/lib/utils.ts';
-import { createChildLogger } from '../src/lib/logger.ts';
+import { getSupabaseAdmin } from '../src/lib/supabase/admin';
+import { extractEntities } from '../src/lib/rag/graph';
+import { batchProcess } from '../src/lib/utils';
+import { createChildLogger } from '../src/lib/logger';
 
 const log = createChildLogger('backfill-entities');
 const supabase = getSupabaseAdmin();
