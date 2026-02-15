@@ -1,66 +1,100 @@
 'use client';
 
-import { Mail, MessageSquare, Send, MapPin, Phone } from 'lucide-react';
+import { Mail, MessageSquare, Send } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export function ContactSection() {
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { x: -20, opacity: 0 },
+        visible: { x: 0, opacity: 1 }
+    };
+
     return (
-        <section id="contact" className="py-32 px-6 bg-[var(--card)]/30 border-t border-[var(--border)]">
-            <div className="max-w-7xl mx-auto space-y-16">
-                <div className="text-center space-y-4">
-                    <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]">Get in Touch</h2>
-                    <p className="text-[var(--muted-foreground)] max-w-xl mx-auto font-medium">
-                        Have questions about NECTA RAG? Whether you&apos;re a student, teacher, or school administrator, we&apos;re here to help.
-                    </p>
+        <section id="contact" className="py-20 px-6 relative">
+            <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={containerVariants}
+                className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16"
+            >
+                <div className="space-y-8">
+                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 text-xs font-bold uppercase tracking-widest">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        Support
+                    </motion.div>
+
+                    <motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]">
+                        Let's start a <span className="gradient-text">Conversation</span>
+                    </motion.h2>
+
+                    <motion.p variants={itemVariants} className="text-lg text-[var(--muted-foreground)] leading-relaxed font-medium">
+                        Have questions about a specific textbook? Need technical support?
+                        Our team is dedicated to ensuring you have the best study experience possible.
+                    </motion.p>
+
+                    <motion.div variants={itemVariants} className="space-y-6">
+                        <div className="flex items-center gap-4 p-6 rounded-2xl bg-[var(--card)] border border-[var(--border)] group hover:border-[var(--accent-blue)]/50 transition-all">
+                            <div className="w-12 h-12 rounded-xl bg-[var(--accent-blue)]/10 flex items-center justify-center text-[var(--accent-blue)] group-hover:scale-110 transition-transform">
+                                <Mail className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Email Us</p>
+                                <p className="text-lg font-bold text-[var(--foreground)]">support@nectarag.co.tz</p>
+                            </div>
+                        </div>
+                    </motion.div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    {/* Contact Info Cards */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <ContactInfoCard
-                            icon={<Mail className="w-5 h-5" />}
-                            title="Email Us"
-                            detail="info@nectarag.co.tz"
-                            href="mailto:info@nectarag.co.tz"
-                        />
-                        <ContactInfoCard
-                            icon={<Phone className="w-5 h-5" />}
-                            title="Call Us"
-                            detail="+255 700 000 000"
-                            href="tel:+255700000000"
-                        />
-                        <ContactInfoCard
-                            icon={<MapPin className="w-5 h-5" />}
-                            title="Office"
-                            detail="Dar es Salaam, Tanzania"
-                            href="#"
-                        />
-                    </div>
+                <motion.div
+                    variants={itemVariants}
+                    className="p-8 md:p-10 rounded-[2.5rem] bg-[var(--card)] border border-[var(--border)] shadow-2xl relative overflow-hidden"
+                >
+                    {/* Interior glow */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent-blue)]/5 blur-[80px] -z-10" />
 
-                    {/* Contact Form */}
-                    <div className="lg:col-span-2">
-                        <div className="glass p-8 md:p-12 rounded-[2.5rem] border border-[var(--border)] shadow-2xl space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[var(--foreground)] ml-1">Full Name</label>
-                                    <input type="text" placeholder="John Doe" className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[var(--foreground)] ml-1">Email Address</label>
-                                    <input type="email" placeholder="john@example.com" className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" />
-                                </div>
+                    <form className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-[var(--foreground)] ml-1">Full Name</label>
+                                <input type="text" className="w-full px-5 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] focus:border-[var(--accent-blue)] outline-none transition-all font-medium" placeholder="John Doe" />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-bold text-[var(--foreground)] ml-1">Message</label>
-                                <textarea rows={4} placeholder="How can we help you?" className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors resize-none"></textarea>
+                                <label className="text-sm font-bold text-[var(--foreground)] ml-1">Email Address</label>
+                                <input type="email" className="w-full px-5 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] focus:border-[var(--accent-blue)] outline-none transition-all font-medium" placeholder="john@example.com" />
                             </div>
-                            <button className="w-full py-4 gradient-tz rounded-2xl text-white font-bold flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all active:scale-95">
-                                <Send className="w-4 h-4" />
-                                Send Message
-                            </button>
                         </div>
-                    </div>
-                </div>
-            </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-[var(--foreground)] ml-1">Subject</label>
+                            <input type="text" className="w-full px-5 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] focus:border-[var(--accent-blue)] outline-none transition-all font-medium" placeholder="How can we help?" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-[var(--foreground)] ml-1">Message</label>
+                            <textarea rows={4} className="w-full px-5 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border)] focus:border-[var(--accent-blue)] outline-none transition-all font-medium resize-none" placeholder="Your message here..." />
+                        </div>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full py-5 rounded-2xl gradient-tz text-white font-bold shadow-[0_10px_30px_rgba(30,129,176,0.3)] hover:shadow-[0_15px_40px_rgba(30,129,176,0.4)] transition-all flex items-center justify-center gap-3 relative overflow-hidden group"
+                        >
+                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity animate-liquid-glow" />
+                            <Send className="w-5 h-5" />
+                            Send Message
+                        </motion.button>
+                    </form>
+                </motion.div>
+            </motion.div>
         </section>
     );
 }
