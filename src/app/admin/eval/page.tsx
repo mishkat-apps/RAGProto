@@ -15,7 +15,8 @@ import {
     CheckCircle2,
     AlertCircle,
     Info,
-    ArrowRight
+    ArrowRight,
+    Star
 } from 'lucide-react';
 
 interface EvalResult {
