@@ -25,6 +25,7 @@ const envSchema = z.object({
 
     // Service Account (JSON string for Vercel)
     GOOGLE_SERVICE_ACCOUNT: z.string().optional(),
+    GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
