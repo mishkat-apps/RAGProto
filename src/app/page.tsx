@@ -111,8 +111,35 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <AboutSection />
-        <ContactSection />
+        {/* CTA to About Page */}
+        <section className="py-20 px-6 border-t border-[var(--border)]">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Discover Our Story</h2>
+            <p className="text-[var(--muted-foreground)] text-lg">
+              Learn how we are leveraging AI to revolutionize the way students interact with the NECTA curriculum.
+            </p>
+            <Link href="/about">
+              <button className="px-8 py-4 rounded-2xl bg-[var(--foreground)] text-[var(--background)] font-bold hover:scale-105 transition-transform">
+                Read About Us
+              </button>
+            </Link>
+          </div>
+        </section>
+
+        {/* CTA to Contact Page */}
+        <section className="py-20 px-6 border-t border-[var(--border)]">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Get in Touch</h2>
+            <p className="text-[var(--muted-foreground)] text-lg">
+              Have questions or want to partner with us? We'd love to hear from you.
+            </p>
+            <Link href="/contact">
+              <button className="px-8 py-4 rounded-2xl bg-[var(--primary)] text-white font-bold hover:scale-105 transition-transform">
+                Contact Us
+              </button>
+            </Link>
+          </div>
+        </section>
       </main>
 
       <Footer />
