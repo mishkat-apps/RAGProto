@@ -1,5 +1,6 @@
 import { genkit, z } from 'genkit';
 export { z };
+import fs from 'fs';
 import { vertexAI } from '@genkit-ai/vertexai';
 import { getEnv } from '../env';
 
@@ -18,9 +19,12 @@ if (env.GOOGLE_SERVICE_ACCOUNT) {
         console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT JSON in Genkit init');
     }
 } else if (env.GOOGLE_APPLICATION_CREDENTIALS && typeof window === 'undefined') {
-    // If we have a file path and we are on the server (node), ensure it's in process.env
-    // The underlying Google SDK used by Genkit will pick it up from process.env.GOOGLE_APPLICATION_CREDENTIALS
-    process.env.GOOGLE_APPLICATION_CREDENTIALS = env.GOOGLE_APPLICATION_CREDENTIALS;
+    // If we have a file path and we are on the server (node), verify it exists
+    if (fs.existsSync(env.GOOGLE_APPLICATION_CREDENTIALS)) {
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = env.GOOGLE_APPLICATION_CREDENTIALS;
+    } else {
+        console.warn(`⚠️ GOOGLE_APPLICATION_CREDENTIALS path specified (${env.GOOGLE_APPLICATION_CREDENTIALS}) but file not found. Skipping.`);
+    }
 } else if (typeof window === 'undefined') {
     console.warn('⚠️ No explicit Google credentials found. Genkit will try to use Application Default Credentials.');
 }

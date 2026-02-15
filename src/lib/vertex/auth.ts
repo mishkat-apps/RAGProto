@@ -1,30 +1,24 @@
 import { GoogleAuth } from 'google-auth-library';
 import { getEnv } from '@/lib/env';
 import { createChildLogger } from '@/lib/logger';
+import fs from 'fs';
 
 const log = createChildLogger('vertex-auth');
 
 /**
  * Returns a GoogleAuth client configured for Vertex AI.
  * Prioritizes GOOGLE_SERVICE_ACCOUNT (JSON string) if provided,
- * otherwise falls back to Application Default Credentials (ADC).
+ * as it is more reliable for serverless environments.
+ * Otherwise falls back to GOOGLE_APPLICATION_CREDENTIALS (file path) or ADC.
  */
 export async function getVertexAuth() {
     const env = getEnv();
 
     try {
-        // Prioritize explicit GOOGLE_APPLICATION_CREDENTIALS (file path) or ADC
-        if (env.GOOGLE_APPLICATION_CREDENTIALS) {
-            log.info({ path: env.GOOGLE_APPLICATION_CREDENTIALS }, 'Attempting authentication with service account key file');
-            return new GoogleAuth({
-                keyFilename: env.GOOGLE_APPLICATION_CREDENTIALS,
-                scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            });
-        }
-
-        // Fallback to GOOGLE_SERVICE_ACCOUNT (JSON string) for Vercel/CI
+        // 1. High Priority: GOOGLE_SERVICE_ACCOUNT (JSON string) 
+        // Best for Vercel, CI/CD, and environments without persistent disk access.
         if (env.GOOGLE_SERVICE_ACCOUNT) {
-            log.info('Attempting authentication with GOOGLE_SERVICE_ACCOUNT JSON string');
+            log.info('Using GOOGLE_SERVICE_ACCOUNT JSON string for authentication');
             try {
                 const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
                 return new GoogleAuth({
@@ -37,6 +31,23 @@ export async function getVertexAuth() {
             }
         }
 
+        // 2. Medium Priority: GOOGLE_APPLICATION_CREDENTIALS (file path)
+        // Usually for local development. We check if it exists to avoid ENOENT crashes.
+        if (env.GOOGLE_APPLICATION_CREDENTIALS) {
+            const path = env.GOOGLE_APPLICATION_CREDENTIALS;
+            if (fs.existsSync(path)) {
+                log.info({ path }, 'Using service account key file for authentication');
+                return new GoogleAuth({
+                    keyFilename: path,
+                    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+                });
+            } else {
+                log.warn({ path }, 'GOOGLE_APPLICATION_CREDENTIALS path specified but file not found. If on Vercel, use GOOGLE_SERVICE_ACCOUNT JSON string instead.');
+                // Fall through to ADC
+            }
+        }
+
+        // 3. Fallback: Application Default Credentials (ADC)
         log.info('No explicit credentials found. Attempting Application Default Credentials (ADC)');
         return new GoogleAuth({
             scopes: ['https://www.googleapis.com/auth/cloud-platform'],
