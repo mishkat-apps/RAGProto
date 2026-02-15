@@ -17,6 +17,7 @@ import {
     Menu,
     Zap,
     Search,
+    Share2,
 } from 'lucide-react';
 import type { Citation } from '@/lib/supabase/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,7 +60,7 @@ export default function ChatPage() {
     const [activeCitations, setActiveCitations] = useState<Citation[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
-    const [mode, setMode] = useState<'rag' | 'cag'>('rag');
+    const [mode, setMode] = useState<'rag' | 'cag' | 'graph'>('rag');
     const activeSession = sessions.find(s => s.id === currentSessionId);
     const messages = activeSession?.messages || [];
 
@@ -428,6 +429,16 @@ export default function ChatPage() {
                                 <Zap className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">CAG</span>
                             </button>
+                            <button
+                                onClick={() => setMode('graph')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mode === 'graph'
+                                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+                                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                                    }`}
+                            >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Graph</span>
+                            </button>
                         </div>
 
                         <select
@@ -457,6 +468,16 @@ export default function ChatPage() {
                         <Zap className="w-4 h-4 text-amber-600" />
                         <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
                             Full Textbook Mode — Entire book loaded into context
+                        </span>
+                    </div>
+                )}
+
+                {/* Graph Mode Banner */}
+                {mode === 'graph' && (
+                    <div className="px-6 py-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-200 flex items-center justify-center gap-2">
+                        <Share2 className="w-4 h-4 text-indigo-600" />
+                        <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                            GraphRAG Mode — Connecting entities across textbook sections
                         </span>
                     </div>
                 )}

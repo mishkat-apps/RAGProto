@@ -7,6 +7,7 @@ import { chunkSections, prepareChunksForDb } from '@/lib/rag/chunking';
 import { generateEmbeddings } from '@/lib/vertex/embeddings';
 import { getEnv } from '@/lib/env';
 import { batchProcess } from '@/lib/utils';
+import { extractEntities } from '@/lib/rag/graph';
 import type { BookInsert, ChunkInsert, IngestJob } from '@/lib/supabase/types';
 
 const log = createChildLogger('ingest-pipeline');
@@ -200,6 +201,53 @@ export async function runIngestionPipeline(input: IngestInput): Promise<void> {
 
         await updateJob(jobId, { status: 'succeeded', progress: 100 });
         log.info({ jobId, bookId, chunks: chunkInserts.length }, 'Ingestion completed');
+
+        // Step 10: Extract and Store Entities (GraphRAG Enrichment)
+        log.info('Step 10: Extracting and storing semantic entities');
+        await batchProcess(chunkInserts, 5, async (batch) => {
+            // Get the inserted chunk IDs from the database using content_hash
+            const { data: dbChunks } = await supabase
+                .from('chunks')
+                .select('id, content, content_hash')
+                .in('content_hash', batch.map(c => c.content_hash));
+
+            if (!dbChunks) return batch;
+
+            for (const dbChunk of dbChunks) {
+                const entities = await extractEntities(dbChunk.content);
+                if (entities.length === 0) continue;
+
+                // Store entities and links
+                for (const ent of entities) {
+                    // 1. Upsert entity
+                    const { data: entity, error: entError } = await supabase
+                        .from('entities')
+                        .upsert({
+                            name: ent.name,
+                            type: ent.type,
+                            description: ent.description
+                        }, { onConflict: 'name, type' })
+                        .select('id')
+                        .single();
+
+                    if (entError || !entity) {
+                        log.warn({ entError, name: ent.name }, 'Failed to upsert entity');
+                        continue;
+                    }
+
+                    // 2. Link chunk to entity
+                    await supabase
+                        .from('chunk_entities')
+                        .upsert({
+                            chunk_id: dbChunk.id,
+                            entity_id: entity.id,
+                            relevance_score: ent.relevance
+                        }, { onConflict: 'chunk_id, entity_id' });
+                }
+            }
+            return batch;
+        });
+
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error({ jobId, error: message }, 'Ingestion pipeline failed');

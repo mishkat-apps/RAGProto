@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getEnv } from '@/lib/env';
+import { getEnv } from '../env';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _admin: SupabaseClient<any, 'public', any> | undefined;

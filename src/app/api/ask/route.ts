@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { answerNECTAQuestion } from '@/lib/genkit/flows';
 import { answerWithFullContext } from '@/lib/genkit/cag-flow';
+import { answerWithGraph } from '@/lib/genkit/graph-flow';
 import { z } from 'zod';
 
 const askSchema = z.object({
@@ -19,7 +20,7 @@ const askSchema = z.object({
         })
         .optional(),
     topK: z.number().int().min(1).max(50).optional(),
-    mode: z.enum(['rag', 'cag']).optional().default('rag'),
+    mode: z.enum(['rag', 'cag', 'graph']).optional().default('rag'),
 });
 
 export async function POST(request: NextRequest) {
@@ -35,9 +36,15 @@ export async function POST(request: NextRequest) {
         }
 
         const { mode, ...requestData } = parsed.data;
-        const result = mode === 'cag'
-            ? await answerWithFullContext(requestData)
-            : await answerNECTAQuestion(requestData);
+        let result;
+
+        if (mode === 'cag') {
+            result = await answerWithFullContext(requestData);
+        } else if (mode === 'graph') {
+            result = await answerWithGraph(requestData);
+        } else {
+            result = await answerNECTAQuestion(requestData);
+        }
 
         return NextResponse.json(result);
     } catch (err) {
