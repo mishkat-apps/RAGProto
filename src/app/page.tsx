@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   ArrowRight,
@@ -10,14 +12,41 @@ import {
   MessageSquare,
   FileUp,
   Library,
+  Loader2,
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { AboutSection } from '@/components/AboutSection';
 import { ContactSection } from '@/components/ContactSection';
+import { createSupabaseBrowser } from '@/lib/supabase/client';
 
 
 export default function LandingPage() {
+  const [question, setQuestion] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const router = useRouter();
+  const supabase = createSupabaseBrowser();
+
+  const handleInstantAsk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim() || isRedirecting) return;
+
+    setIsRedirecting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        await supabase.auth.signInAnonymously();
+      }
+
+      router.push(`/chat?q=${encodeURIComponent(question.trim())}`);
+    } catch (error) {
+      console.error('Guest sign-in failed:', error);
+      // Fallback: search anyway?
+      router.push(`/chat?q=${encodeURIComponent(question.trim())}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[var(--background)] selection:bg-[var(--primary)]/10 flex flex-col">
       <Header />
@@ -46,17 +75,30 @@ export default function LandingPage() {
 
             {/* Search-style Prompt Box */}
             <div className="max-w-2xl mx-auto group">
-              <Link href="/chat" className="relative block">
+              <form onSubmit={handleInstantAsk} className="relative block">
                 <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] to-[var(--accent-blue)] rounded-[2rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
-                <div className="relative glass p-2 rounded-[2rem] flex items-center shadow-2xl border-white/50 group-hover:scale-[1.02] transition-transform">
-                  <div className="flex-1 px-6 text-left text-[var(--muted-foreground)] font-medium">
-                    Ask anything about your syllabus...
-                  </div>
-                  <div className="w-14 h-14 rounded-full gradient-tz flex items-center justify-center text-white shadow-lg">
-                    <ArrowRight className="w-6 h-6" />
-                  </div>
+                <div className="relative glass p-2 rounded-[2rem] flex items-center shadow-2xl border-white/50 group-hover:scale-[1.01] transition-transform focus-within:ring-2 ring-[var(--primary)]/20">
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder="Ask anything about your syllabus..."
+                    className="flex-1 px-6 bg-transparent border-none focus:outline-none text-[var(--foreground)] font-medium placeholder:text-[var(--muted-foreground)]"
+                    disabled={isRedirecting}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!question.trim() || isRedirecting}
+                    className="w-14 h-14 rounded-full gradient-tz flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    {isRedirecting ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-6 h-6" />
+                    )}
+                  </button>
                 </div>
-              </Link>
+              </form>
             </div>
 
             {/* Suggestion Cards */}

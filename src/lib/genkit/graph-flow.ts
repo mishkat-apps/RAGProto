@@ -1,4 +1,5 @@
 import { ai } from './index';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { retrieveWithGraph } from '@/lib/rag/graph';
 import { enrichChunksWithContext } from '@/lib/rag/retrieval';
 import { createChildLogger } from '@/lib/logger';
@@ -75,6 +76,22 @@ export async function answerWithGraph(request: AskRequest): Promise<AskResponse>
         chunks.some(c => c.similarity > 0.5) ? 'medium' : 'low';
 
     log.info({ confidence, citationCount: citations.length }, 'GraphRAG answer generated');
+
+    // Step 6: Log query
+    try {
+        const supabase = getSupabaseAdmin();
+        await supabase.from('queries_log').insert({
+            question,
+            filters: { ...filters, mode: 'graph' },
+            retrieved_chunk_ids: chunks.map((c) => c.id),
+            answer,
+            citations,
+            confidence,
+            user_id: request.userId,
+        });
+    } catch {
+        log.warn('Failed to log GraphRAG query (non-fatal)');
+    }
 
     return { answer, citations, confidence };
 }

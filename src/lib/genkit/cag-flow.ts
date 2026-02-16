@@ -162,6 +162,7 @@ export async function answerWithFullContext(request: AskRequest): Promise<AskRes
             answer,
             citations: [],
             confidence: 'high',
+            user_id: request.userId,
         });
     } catch {
         log.warn('Failed to log CAG query (non-fatal)');

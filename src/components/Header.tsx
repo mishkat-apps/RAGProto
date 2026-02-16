@@ -6,18 +6,38 @@ import { usePathname } from 'next/navigation';
 import { BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { createSupabaseBrowser } from '@/lib/supabase/client';
+import { User } from '@supabase/supabase-js';
 
 export function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
     const pathname = usePathname();
+    const supabase = createSupabaseBrowser();
 
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 20);
         };
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        fetchUser();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            subscription.unsubscribe();
+        };
+    }, [supabase]);
+
+    const isAnonymous = user?.is_anonymous || user?.app_metadata.provider === 'anonymous';
 
     const navLinks = [
         { name: 'Features', href: '/#features' },
@@ -77,12 +97,42 @@ export function Header() {
                 <div className="flex items-center gap-4">
                     <ThemeToggle />
                     <div className="hidden sm:flex items-center gap-3">
-                        <Link href="/auth/signin">
-                            <button className="text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] px-5 py-2.5 rounded-xl transition-all">Sign In</button>
-                        </Link>
-                        <Link href="/auth/signup">
-                            <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 hover:scale-105 transition-all active:scale-95">Sign Up</button>
-                        </Link>
+                        {user ? (
+                            <>
+                                {isAnonymous ? (
+                                    <>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">Guest Access</span>
+                                            <Link href="/auth/signup">
+                                                <button className="text-xs font-bold text-[var(--foreground)] hover:underline">Register to save history</button>
+                                            </Link>
+                                        </div>
+                                        <Link href="/auth/signup">
+                                            <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 hover:scale-105 transition-all active:scale-95">Sign Up</button>
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-sm font-bold text-[var(--foreground)]">{user.email?.split('@')[0]}</span>
+                                        <button
+                                            onClick={() => supabase.auth.signOut()}
+                                            className="text-sm font-bold text-[var(--muted-foreground)] hover:text-red-500 transition-colors"
+                                        >
+                                            Sign Out
+                                        </button>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Link href="/auth/signin">
+                                    <button className="text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] px-5 py-2.5 rounded-xl transition-all">Sign In</button>
+                                </Link>
+                                <Link href="/auth/signup">
+                                    <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 hover:scale-105 transition-all active:scale-95">Sign Up</button>
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
 

@@ -171,6 +171,7 @@ export async function answerNECTAQuestion(request: AskRequest): Promise<AskRespo
             answer,
             citations,
             confidence,
+            user_id: request.userId,
         });
     } catch {
         log.warn('Failed to log query (non-fatal)');

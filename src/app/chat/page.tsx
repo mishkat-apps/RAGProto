@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import {
     Send,
@@ -24,6 +24,10 @@ import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useSearchParams } from 'next/navigation';
+import { createSupabaseBrowser } from '@/lib/supabase/client';
+import { User } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'framer-motion';
 
 
 interface Message {
@@ -48,7 +52,7 @@ interface BookOption {
     form: number;
 }
 
-export default function ChatPage() {
+function ChatContent() {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string>('');
     const [input, setInput] = useState('');
@@ -61,6 +65,13 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [mode, setMode] = useState<'rag' | 'cag' | 'graph'>('rag');
+    const [user, setUser] = useState<User | null>(null);
+    const [guestCount, setGuestCount] = useState<number | null>(null);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+
+    const searchParams = useSearchParams();
+    const supabase = createSupabaseBrowser();
+
     const activeSession = sessions.find(s => s.id === currentSessionId);
     const messages = activeSession?.messages || [];
 
@@ -136,37 +147,52 @@ export default function ChatPage() {
         initialize();
     }, []);
 
+    // Check auth and guest count
     useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem('necta_sessions', JSON.stringify(sessions));
-        }
-    }, [sessions, isLoaded]);
+        const checkAuth = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
 
+            if (user && (user.is_anonymous || user.app_metadata.provider === 'anonymous')) {
+                const { count, error } = await supabase
+                    .from('queries_log')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', user.id);
+
+                if (!error) setGuestCount(count);
+            }
+        };
+        checkAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [supabase]);
+
+    // Handle auto-trigger from URL
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [currentSessionId, sessions]);
+        if (!isLoaded || !currentSessionId) return;
 
-    const deleteSession = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        if (confirm('Delete this chat history?')) {
-            const updated = sessions.filter(s => s.id !== id);
-            setSessions(updated);
-            if (currentSessionId === id) {
-                if (updated.length > 0) {
-                    setCurrentSessionId(updated[0].id);
-                } else {
-                    startNewChat();
-                }
+        const query = searchParams.get('q');
+        if (query) {
+            // Clean URL
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url.pathname + url.search);
+
+            // Trigger submit
+            if (input === '' && messages.length === 0) {
+                // We simulate the submit by setting input and calling handleSearch
+                // But handleSubmit is a form event handler, so we create a helper
+                performSearch(query);
             }
         }
-    };
+    }, [isLoaded, searchParams, currentSessionId]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || loading || !currentSessionId) return;
-
-        const question = input.trim();
-        setInput('');
+    const performSearch = async (question: string) => {
+        if (!question.trim() || loading || !currentSessionId) return;
 
         const userMsg: Message = { role: 'user', content: question };
         const updatedMsgs = [...messages, userMsg];
@@ -200,7 +226,10 @@ export default function ChatPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                const errorMsg: Message = { role: 'assistant', content: `Error: ${data.error || 'Failed to get answer'}` };
+                if (data.error === 'LIMIT_REACHED') {
+                    setShowLimitModal(true);
+                }
+                const errorMsg: Message = { role: 'assistant', content: `Error: ${data.message || data.error || 'Failed to get answer'}` };
                 setSessions(prev => prev.map(s => s.id === currentSessionId ? {
                     ...s,
                     messages: [...s.messages, errorMsg],
@@ -218,6 +247,9 @@ export default function ChatPage() {
                     messages: [...s.messages, assistantMsg],
                     updatedAt: Date.now()
                 } : s));
+
+                // Update guest count locally if guest
+                if (guestCount !== null) setGuestCount(prev => (prev || 0) + 1);
             }
         } catch {
             const errorMsg: Message = { role: 'assistant', content: 'Error: Network error. Please try again.' };
@@ -229,6 +261,39 @@ export default function ChatPage() {
         }
 
         setLoading(false);
+    };
+
+    const deleteSession = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (confirm('Delete this chat history?')) {
+            const updated = sessions.filter(s => s.id !== id);
+            setSessions(updated);
+            if (currentSessionId === id) {
+                if (updated.length > 0) {
+                    setCurrentSessionId(updated[0].id);
+                } else {
+                    startNewChat();
+                }
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (isLoaded) {
+            localStorage.setItem('necta_sessions', JSON.stringify(sessions));
+        }
+    }, [sessions, isLoaded]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [currentSessionId, sessions]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const question = input.trim();
+        if (!question) return;
+        setInput('');
+        await performSearch(question);
     };
 
     const confidenceColor = (conf?: string) => {
@@ -459,6 +524,18 @@ export default function ChatPage() {
                         </select>
                         <ThemeToggle />
                     </div>
+
+                    {/* Guest Usage Badge */}
+                    {guestCount !== null && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20">
+                            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20 shadow-sm backdrop-blur-md">
+                                <div className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--primary)]">
+                                    Guest Usage: {guestCount}/10 Questions
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </header>
 
 
@@ -724,7 +801,70 @@ export default function ChatPage() {
                     </div>
                 </>
             )}
+
+            {/* Limit Reached Modal */}
+            <AnimatePresence>
+                {showLimitModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                            onClick={() => setShowLimitModal(false)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-lg glass rounded-[2.5rem] p-10 shadow-2xl border-white/20 text-center space-y-8"
+                        >
+                            <div className="w-20 h-20 rounded-3xl gradient-tz flex items-center justify-center mx-auto shadow-xl">
+                                <Zap className="w-10 h-10 text-white" />
+                            </div>
+
+                            <div className="space-y-4">
+                                <h2 className="text-3xl font-black tracking-tight text-[var(--foreground)] leading-tight">
+                                    Guest Limit Reached
+                                </h2>
+                                <p className="text-[var(--muted-foreground)] font-medium leading-relaxed italic">
+                                    "Knowledge is the only thing that grows when you share it."
+                                </p>
+                                <p className="text-[var(--muted-foreground)] font-medium leading-relaxed">
+                                    You've reached your 10-question guest limit. Create a permanent account to keep your history and unlock unlimited learning.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Link href="/auth/signup" className="w-full">
+                                    <button className="w-full py-4 rounded-2xl gradient-btn text-white font-bold shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all">
+                                        Join Now — Free
+                                    </button>
+                                </Link>
+                                <button
+                                    onClick={() => setShowLimitModal(false)}
+                                    className="w-full py-4 rounded-2xl bg-[var(--muted)] text-[var(--muted-foreground)] font-bold hover:bg-[var(--border)] transition-all"
+                                >
+                                    Maybe later
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
+    );
+}
+
+export default function ChatPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
+            </div>
+        }>
+            <ChatContent />
+        </Suspense>
     );
 }
 

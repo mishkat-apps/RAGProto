@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { answerNECTAQuestion } from '@/lib/genkit/flows';
 import { answerWithFullContext } from '@/lib/genkit/cag-flow';
 import { answerWithGraph } from '@/lib/genkit/graph-flow';
+import { createSupabaseServer } from '@/lib/supabase/server';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
 const askSchema = z.object({
@@ -35,15 +37,46 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // --- Guest / Auth Check ---
+        const supabase = await createSupabaseServer();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+        }
+
+        const isAnonymous = user.is_anonymous || user.app_metadata.provider === 'anonymous';
+        const userId = user.id;
+
+        if (isAnonymous) {
+            const admin = getSupabaseAdmin();
+            const { count, error: countErr } = await admin
+                .from('queries_log')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId);
+
+            if (countErr) {
+                console.error('Error checking guest count:', countErr);
+            } else if (count !== null && count >= 10) {
+                return NextResponse.json(
+                    { error: 'LIMIT_REACHED', message: 'Guest limit reached. Please register to continue.' },
+                    { status: 403 }
+                );
+            }
+        }
+        // --------------------------
+
         const { mode, ...requestData } = parsed.data;
+        // Inject userId into requestData for the flows to use for logging
+        const enrichedRequestData = { ...requestData, userId };
         let result;
 
         if (mode === 'cag') {
-            result = await answerWithFullContext(requestData);
+            result = await answerWithFullContext(enrichedRequestData);
         } else if (mode === 'graph') {
-            result = await answerWithGraph(requestData);
+            result = await answerWithGraph(enrichedRequestData);
         } else {
-            result = await answerNECTAQuestion(requestData);
+            result = await answerNECTAQuestion(enrichedRequestData);
         }
 
         return NextResponse.json(result);

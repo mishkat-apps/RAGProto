@@ -74,6 +74,7 @@ export interface QueryLog {
     answer: string;
     citations: Citation[];
     confidence: 'high' | 'medium' | 'low';
+    user_id?: string;
     created_at: string;
 }
 
@@ -128,6 +129,7 @@ export interface AskRequest {
     };
     history?: ChatMessage[];
     topK?: number;
+    userId?: string;
 }
 
 export interface AskResponse {
