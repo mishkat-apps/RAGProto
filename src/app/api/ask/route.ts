@@ -39,7 +39,12 @@ export async function POST(request: NextRequest) {
 
         // --- Guest / Auth Check ---
         const supabase = await createSupabaseServer();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        console.log('--- API Auth Debug ---');
+        console.log('User found:', !!user);
+        console.log('User ID:', user?.id);
+        if (authError) console.error('Auth Error:', authError);
 
         if (!user) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
