@@ -3,6 +3,7 @@
 :root {
   /* === Light Mode Base === */
   --background: #F8FAFB;
+  --background-rgb: 248, 250, 251;
   --foreground: #1A1A2E;
   --card: #FFFFFF;
   --card-foreground: #1A1A2E;
@@ -45,6 +46,8 @@
 }
 
 [data-theme="tanzania"] {
+  --background: #F8FAFB;
+  --background-rgb: 248, 250, 251;
   --gradient-from: var(--tz-green);
   --gradient-via: var(--tz-gold);
   --gradient-to: var(--tz-blue);

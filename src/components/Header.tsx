@@ -28,79 +28,75 @@ export function Header() {
     return (
         <motion.header
             initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            className={`fixed top-0 w-full z-50 transition-all duration-500 px-6 py-4 flex justify-center`}
+            animate={{
+                y: 0,
+                height: isScrolled ? '64px' : '88px',
+                backgroundColor: isScrolled ? 'rgba(var(--background-rgb), 0.8)' : 'transparent',
+                backdropFilter: isScrolled ? 'blur(20px)' : 'blur(0px)',
+            }}
+            className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 border-b ${isScrolled ? 'border-border/50 shadow-sm' : 'border-transparent'
+                } flex items-center justify-center`}
         >
-            <motion.div
-                animate={{
-                    width: isScrolled ? '90%' : '100%',
-                    maxWidth: isScrolled ? '1000px' : '1400px',
-                    borderRadius: isScrolled ? '24px' : '0px',
-                    y: isScrolled ? 10 : 0
-                }}
-                className={`relative w-full transition-all duration-500 overflow-hidden ${isScrolled
-                        ? 'bg-[var(--background)]/70 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_32px_rgba(0,0,0,0.1)]'
-                        : 'bg-transparent border-b border-[var(--border)]'
-                    }`}
-            >
-                {/* Liquid Glow Border (Only when scrolled) */}
-                <AnimatePresence>
-                    {isScrolled && (
+            <div className="w-full max-w-7xl mx-auto px-6 h-full flex items-center justify-between relative">
+                <div className="flex items-center gap-8">
+                    <Link href="/" className="flex items-center gap-3 group">
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 -z-10 animate-liquid-glow pointer-events-none"
-                            style={{
-                                padding: '1px',
-                                background: 'linear-gradient(90deg, var(--tz-green), var(--tz-gold), var(--tz-blue), var(--tz-green))',
-                                mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                maskComposite: 'exclude',
-                                WebkitMaskComposite: 'xor',
-                            }}
-                        />
-                    )}
-                </AnimatePresence>
+                            animate={{ scale: isScrolled ? 0.9 : 1 }}
+                            className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"
+                        >
+                            <BookOpen className="w-5 h-5 text-white" />
+                        </motion.div>
+                        <motion.span
+                            animate={{ opacity: 1, x: 0 }}
+                            className="font-bold text-xl tracking-tight text-[var(--foreground)] hidden sm:block"
+                        >
+                            NECTA RAG
+                        </motion.span>
+                    </Link>
 
-                <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <Link href="/" className="flex items-center gap-3 group">
-                            <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                <BookOpen className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="font-bold text-xl tracking-tight text-[var(--foreground)] hidden sm:block">NECTA RAG</span>
-                        </Link>
+                    <nav className="hidden md:flex items-center gap-8">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.name}
+                                href={link.href}
+                                className="relative text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors uppercase tracking-[0.2em] group/link"
+                            >
+                                {link.name}
+                                {pathname === link.href && (
+                                    <motion.div
+                                        layoutId="nav-underline"
+                                        className="absolute -bottom-2 left-0 right-0 h-0.5 gradient-tz rounded-full shadow-[0_0_8px_rgba(30,181,58,0.4)]"
+                                    />
+                                )}
+                            </Link>
+                        ))}
+                    </nav>
+                </div>
 
-                        <nav className="hidden md:flex items-center gap-8 ml-8">
-                            {navLinks.map((link) => (
-                                <Link
-                                    key={link.name}
-                                    href={link.href}
-                                    className="relative text-sm font-bold text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors uppercase tracking-widest group/link"
-                                >
-                                    {link.name}
-                                    {pathname === link.href && (
-                                        <motion.div
-                                            layoutId="nav-underline"
-                                            className="absolute -bottom-1 left-0 right-0 h-0.5 gradient-tz rounded-full"
-                                        />
-                                    )}
-                                </Link>
-                            ))}
-                        </nav>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <ThemeToggle />
+                <div className="flex items-center gap-4">
+                    <ThemeToggle />
+                    <div className="hidden sm:flex items-center gap-3">
                         <Link href="/auth/signin">
-                            <button className="hidden sm:block text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] px-5 py-2.5 rounded-xl transition-all">Sign In</button>
+                            <button className="text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] px-5 py-2.5 rounded-xl transition-all">Sign In</button>
                         </Link>
                         <Link href="/auth/signup">
-                            <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 transition-all active:scale-95">Sign Up</button>
+                            <button className="px-6 py-2.5 gradient-tz rounded-xl text-sm font-bold text-white shadow-xl hover:opacity-90 hover:scale-105 transition-all active:scale-95">Sign Up</button>
                         </Link>
                     </div>
                 </div>
-            </motion.div>
+
+                {/* Horizon Line (Tanzanian Gradient) */}
+                <AnimatePresence>
+                    {isScrolled && (
+                        <motion.div
+                            initial={{ scaleX: 0, opacity: 0 }}
+                            animate={{ scaleX: 1, opacity: 1 }}
+                            exit={{ scaleX: 0, opacity: 0 }}
+                            className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[var(--tz-green)] via-[var(--tz-gold)] to-[var(--tz-blue)] origin-center"
+                        />
+                    )}
+                </AnimatePresence>
+            </div>
         </motion.header>
     );
 }
