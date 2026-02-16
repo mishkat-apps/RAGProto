@@ -31,11 +31,12 @@ export function Header() {
             animate={{
                 y: 0,
                 height: isScrolled ? '64px' : '88px',
-                backgroundColor: isScrolled ? 'rgba(var(--background-rgb), 0.8)' : 'transparent',
-                backdropFilter: isScrolled ? 'blur(20px)' : 'blur(0px)',
+                backgroundColor: isScrolled ? 'rgba(var(--background-rgb), 0.95)' : 'rgba(var(--background-rgb), 0.5)',
+                backdropFilter: 'blur(20px)',
             }}
-            className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 border-b ${isScrolled ? 'border-border/50 shadow-sm' : 'border-transparent'
-                } flex items-center justify-center`}
+            style={{ width: '100VW', left: 0, right: 0 }}
+            className={`fixed top-0 z-50 transition-all duration-500 border-b ${isScrolled ? 'border-border/50 shadow-lg' : 'border-transparent'
+                }`}
         >
             <div className="w-full max-w-7xl mx-auto px-6 h-full flex items-center justify-between relative">
                 <div className="flex items-center gap-8">
