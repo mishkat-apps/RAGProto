@@ -2,14 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, Loader2, BookOpen, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, BookOpen, AlertCircle, Phone, Hash, CheckCircle2 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
 export function SignInForm() {
+    const [authMode, setAuthMode] = useState<'email' | 'phone'>('email');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [phone, setPhone] = useState('+255');
+    const [otp, setOtp] = useState('');
+    const [step, setStep] = useState<'input' | 'verify'>('input');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const supabase = createSupabaseBrowser();
 
     const handleSignIn = async (e: React.FormEvent) => {
@@ -20,6 +25,44 @@ export function SignInForm() {
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
+        });
+
+        if (error) {
+            setError(error.message);
+            setLoading(false);
+        } else {
+            window.location.href = '/chat';
+        }
+    };
+
+    const handlePhoneSignIn = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.signInWithOtp({
+            phone: phone.trim(),
+        });
+
+        if (error) {
+            setError(error.message);
+            setLoading(false);
+        } else {
+            setStep('verify');
+            setLoading(false);
+            setSuccess('OTP sent to your phone!');
+        }
+    };
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.verifyOtp({
+            phone: phone.trim(),
+            token: otp.trim(),
+            type: 'sms',
         });
 
         if (error) {
@@ -52,6 +95,21 @@ export function SignInForm() {
             </div>
 
             <div className="glass p-8 rounded-[2.5rem] border border-[var(--border)] shadow-2xl space-y-6">
+                <div className="flex p-1.5 bg-[var(--background)] rounded-2xl border border-[var(--border)]">
+                    <button
+                        onClick={() => { setAuthMode('email'); setError(null); }}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${authMode === 'email' ? 'bg-[var(--primary)] text-white shadow-lg' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                    >
+                        Email
+                    </button>
+                    <button
+                        onClick={() => { setAuthMode('phone'); setError(null); }}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${authMode === 'phone' ? 'bg-[var(--primary)] text-white shadow-lg' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                    >
+                        Phone
+                    </button>
+                </div>
+
                 {error && (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 text-red-600 border border-red-100 animate-shake">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -59,50 +117,115 @@ export function SignInForm() {
                     </div>
                 )}
 
-                <form onSubmit={handleSignIn} className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest ml-1">Email</label>
-                        <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
-                            <input
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="mwanafunzi@shule.ac.tz"
-                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
-                                disabled={loading}
-                            />
-                        </div>
+                {success && !error && (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 animate-slide-up">
+                        <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                        <p className="text-sm font-bold">{success}</p>
                     </div>
+                )}
 
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center ml-1">
-                            <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest">Password</label>
-                            <a href="#" className="text-xs font-bold text-[var(--primary)] hover:underline">Forgot?</a>
+                {authMode === 'email' ? (
+                    <form onSubmit={handleSignIn} className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest ml-1">Email</label>
+                            <div className="relative">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                                <input
+                                    type="email"
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="mwanafunzi@shule.ac.tz"
+                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                    disabled={loading}
+                                />
+                            </div>
                         </div>
-                        <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
-                            <input
-                                type="password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
-                                disabled={loading}
-                            />
-                        </div>
-                    </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-4 gradient-tz rounded-2xl text-white font-bold flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
-                    </button>
-                </form>
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center ml-1">
+                                <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest">Password</label>
+                                <a href="#" className="text-xs font-bold text-[var(--primary)] hover:underline">Forgot?</a>
+                            </div>
+                            <div className="relative">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                                <input
+                                    type="password"
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                    disabled={loading}
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-4 gradient-tz rounded-2xl text-white font-bold flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={step === 'input' ? handlePhoneSignIn : handleVerifyOtp} className="space-y-4">
+                        {step === 'input' ? (
+                            <div className="space-y-2 animate-slide-up">
+                                <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest ml-1">Phone Number</label>
+                                <div className="relative">
+                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                                    <input
+                                        type="tel"
+                                        required
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        placeholder="+255 700 000 000"
+                                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <p className="text-[10px] text-[var(--muted-foreground)] ml-1 font-medium">Use format +255 for Tanzania numbers</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 animate-slide-up">
+                                <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest ml-1">Verification Code</label>
+                                <div className="relative">
+                                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                                    <input
+                                        type="text"
+                                        required
+                                        autoFocus
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value)}
+                                        placeholder="123456"
+                                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center px-1">
+                                    <p className="text-[10px] text-[var(--muted-foreground)] font-medium">Step 2: Enter the 6-digit code</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep('input')}
+                                        className="text-[10px] font-bold text-[var(--primary)] hover:underline"
+                                    >
+                                        Change Number
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-4 gradient-tz rounded-2xl text-white font-bold flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (step === 'input' ? 'Send OTP' : 'Verify & Sign In')}
+                        </button>
+                    </form>
+                )}
 
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[var(--border)]"></div></div>
