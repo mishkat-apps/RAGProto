@@ -42,6 +42,15 @@ export function SignUpForm() {
         }
     };
 
+    const handleGoogleSignIn = async () => {
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/api/auth/callback?next=/chat`,
+            },
+        });
+    };
+
     if (success) {
         return (
             <div className="w-full max-w-md glass p-12 rounded-[3rem] border border-[var(--border)] shadow-2xl text-center space-y-6 animate-slide-up">
@@ -145,6 +154,7 @@ export function SignUpForm() {
                 </div>
 
                 <button
+                    onClick={handleGoogleSignIn}
                     type="button"
                     className="w-full py-4 border border-[var(--border)] rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-[var(--muted)] transition-all active:scale-95"
                 >
