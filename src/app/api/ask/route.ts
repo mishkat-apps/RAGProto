@@ -81,8 +81,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(result);
     } catch (err) {
+        console.error('Error in /api/ask:', err);
         return NextResponse.json(
-            { error: err instanceof Error ? err.message : 'Unknown error' },
+            { error: 'INTERNAL_ERROR', message: err instanceof Error ? err.message : 'Unknown error' },
             { status: 500 }
         );
     }

@@ -36,7 +36,13 @@ export default function LandingPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        await supabase.auth.signInAnonymously();
+        const { error: signInError } = await supabase.auth.signInAnonymously();
+        if (signInError) {
+          console.error('Anonymous sign-in error:', signInError);
+          setIsRedirecting(false);
+          alert('Failed to sign in as guest. Please enable anonymous sign-ins in Supabase or sign up.');
+          return;
+        }
       }
 
       router.push(`/chat?q=${encodeURIComponent(question.trim())}`);
